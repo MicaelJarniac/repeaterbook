@@ -1,0 +1,28 @@
+{
+  "template": "https://github.com/MicaelJarniac/crustypy",
+  "commit": "3af00654de427f00c49ac2f2281ff3522f0b7416",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "full_name": "Micael Jarniac",
+      "email": "micael@jarniac.dev",
+      "github_username": "MicaelJarniac",
+      "year": "2025",
+      "project_name": "RepeaterBook",
+      "project_slug": "repeaterbook",
+      "project_distribution_name": "repeaterbook",
+      "project_short_description": "Python utility to work with data from RepeaterBook.",
+      "version": "0.0.0",
+      "main_branch": "main",
+      "shields_url": "https://img.shields.io",
+      "discord_invite": "Ye9yJtZQuN",
+      "report_method": "micael@jarniac.dev",
+      "__github_path": "MicaelJarniac/repeaterbook",
+      "__github_url": "https://github.com/MicaelJarniac/repeaterbook",
+      "__readthedocs_name": "repeaterbook",
+      "_template": "https://github.com/MicaelJarniac/crustypy",
+      "_commit": "3af00654de427f00c49ac2f2281ff3522f0b7416"
+    }
+  },
+  "directory": null
+}
