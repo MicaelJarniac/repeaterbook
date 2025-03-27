@@ -20,7 +20,15 @@ classifiers = [
 
 requires-python = ">=3.9"  # py_ver
 dependencies = [
+    "aiohttp>=3.11.14",
+    "anyio>=4.9.0",
+    "attrs>=25.3.0",
+    "haversine>=2.9.0",
     "loguru>=0.7.3",
+    "pycountry>=24.6.1",
+    "sqlmodel>=0.0.24",
+    "tqdm>=4.67.1",
+    "yarl>=1.18.3",
 ]
 
 [build-system]
@@ -79,6 +87,9 @@ dev = [
     {include-group = "automation"},
     "ipython>=8.18.1",
     "python-semantic-release>=9.19.0",
+    "pandas>=2.2.3",
+    "ipykernel>=6.29.5",
+    "rich>=13.9.4",
 ]
 
 [tool.ruff]
