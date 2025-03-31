@@ -18,7 +18,7 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 
-requires-python = ">=3.9"  # py_ver
+requires-python = ">=3.10"  # py_ver
 dependencies = [
     "aiohttp>=3.11.14",
     "anyio>=4.9.0",
@@ -67,6 +67,7 @@ typing = [
     {include-group = "automation"},
     "mypy>=1.15.0",
     # Typing stubs go here
+    "types-tqdm>=4.67.0.20250319",
 ]
 linting = [
     "ruff>=0.9.6",

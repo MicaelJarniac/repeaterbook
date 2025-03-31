@@ -3,6 +3,7 @@ allstar
 APCO
 autosummary
 Callsign
+callsigns
 canwarn
 celerybeat
 Connor
@@ -12,10 +13,12 @@ Cython
 dmypy
 docstrings
 echolink
+emcomm
 epub
 errorlevel
 furo
 genindex
+GMRS
 Hispanola
 htmlcov
 ignorelist
@@ -62,6 +65,7 @@ SPHINXOPTS
 Spyder
 spyderproject
 spyproject
+stype
 toctree
 unittests
 venv

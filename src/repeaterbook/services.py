@@ -9,23 +9,44 @@ __all__: list[str] = [
     "RepeaterBook",
     "fetch_json",
     "json_to_model",
-    "main",
 ]
 
+import asyncio
 import hashlib
 import json
 import time
-from typing import Any, ClassVar, Final
+from datetime import date, timedelta
+from functools import cached_property
+from typing import TYPE_CHECKING, Any, ClassVar, Final, cast
 
 import aiohttp
 import attrs
 from anyio import Path
 from loguru import logger
-from pycountry.db import Country
+from sqlmodel import Session, SQLModel, create_engine
 from tqdm import tqdm
 from yarl import URL
 
-from repeaterbook.models import ExportJson, Repeater, RepeaterJson, Status, Use
+from repeaterbook.models import (
+    Emergency,
+    EmergencyJSON,
+    ExportErrorJSON,
+    ExportJSON,
+    ExportNorthAmericaQuery,
+    ExportQuery,
+    ExportWorldQuery,
+    Mode,
+    ModeJSON,
+    Repeater,
+    RepeaterJSON,
+    ServiceType,
+    ServiceTypeJSON,
+    Status,
+    Use,
+)
+
+if TYPE_CHECKING:  # pragma: no cover
+    from sqlalchemy import Engine
 
 
 async def fetch_json(
@@ -33,7 +54,7 @@ async def fetch_json(
     *,
     headers: dict[str, str] | None = None,
     cache_dir: Path | None = None,
-    max_cache_age: int = 3600,
+    max_cache_age: timedelta = timedelta(seconds=3600),
     chunk_size: int = 1024,
 ) -> Any:  # noqa: ANN401
     """Fetches JSON data from the specified URL using a streaming response.
@@ -52,9 +73,11 @@ async def fetch_json(
     # Check if fresh cached data exists.
     if await cache_file.exists():
         file_age = time.time() - (await cache_file.stat()).st_mtime
-        if file_age < max_cache_age:
+        if file_age < max_cache_age.total_seconds():
             logger.info("Using cached data.")
             return json.loads(await cache_file.read_text(encoding="utf-8"))
+
+    await cache_file.unlink(missing_ok=True)
 
     logger.info("Fetching new data from API...")
     async with (
@@ -98,7 +121,15 @@ STATUS_MAP: Final = {
 }
 
 
-def json_to_model(j: RepeaterJson, /) -> Repeater:
+def parse_date(date_str: str) -> date:
+    """Parses a date string in the format YYYY-MM-DD."""
+    try:
+        return date.fromisoformat(date_str)
+    except ValueError:
+        return date.min
+
+
+def json_to_model(j: RepeaterJSON, /) -> Repeater:
     """Converts a JSON object to a Repeater model."""
     return Repeater.model_validate(
         Repeater(
@@ -120,14 +151,14 @@ def json_to_model(j: RepeaterJson, /) -> Repeater:
             use_membership=USE_MAP[j["Use"]],
             operational_status=STATUS_MAP[j["Operational Status"]],
             allstar_node=j["AllStar Node"],
-            echolink_node=j["EchoLink Node"] or None,
+            echolink_node=str(j["EchoLink Node"]) or None,
             irlp_node=j["IRLP Node"] or None,
             wires_node=j["Wires Node"] or None,
             analog_capable=BOOL_MAP[j["FM Analog"]],
             fm_bandwidth=j["FM Bandwidth"].replace(" kHz", "") or None,
             dmr_capable=BOOL_MAP[j["DMR"]],
             dmr_color_code=j["DMR Color Code"] or None,
-            dmr_id=j["DMR ID"] or None,
+            dmr_id=str(j["DMR ID"]) or None,
             d_star_capable=BOOL_MAP[j["D-Star"]],
             nxdn_capable=BOOL_MAP[j["NXDN"]],
             apco_p_25_capable=BOOL_MAP[j["APCO P-25"]],
@@ -139,7 +170,7 @@ def json_to_model(j: RepeaterJson, /) -> Repeater:
             tetra_mnc=j["Tetra MNC"] or None,
             yaesu_system_fusion_capable=BOOL_MAP[j["System Fusion"]],
             notes=j["Notes"] or None,
-            last_update=j["Last Update"],
+            last_update=parse_date(j["Last Update"]),
         )
     )
 
@@ -153,8 +184,40 @@ class RepeaterBook:
     app_email: str = "micael@jarniac.dev"
 
     working_dir: Path = attrs.Factory(lambda: Path())
+    database: str = "repeaterbook.db"
 
     MAX_COUNT: ClassVar = 3500
+
+    async def cache_dir(self) -> Path:
+        """Cache directory for API responses."""
+        cache = self.working_dir / ".repeaterbook_cache"
+        if not await cache.exists():
+            logger.info("Creating cache directory.")
+            await cache.mkdir(parents=True, exist_ok=True)
+            gitignore = cache / ".gitignore"
+            if not await gitignore.exists():
+                logger.info("Creating .gitignore file.")
+                await gitignore.write_text("*\n", encoding="utf-8")
+        return cache
+
+    @property
+    def database_path(self) -> Path:
+        """Database path."""
+        return self.working_dir / self.database
+
+    @property
+    def database_uri(self) -> str:
+        """Database URI."""
+        return f"sqlite:///{self.database_path}"
+
+    @cached_property
+    def engine(self) -> Engine:
+        """Create database engine."""
+        return create_engine(self.database_uri)
+
+    def init_db(self) -> None:
+        """Initialize database."""
+        SQLModel.metadata.create_all(self.engine)
 
     @property
     def url_api(self) -> URL:
@@ -171,19 +234,68 @@ class RepeaterBook:
         """Rest of world (not north-america) export URL."""
         return self.url_api / "exportROW.php"
 
-    def url_export(self, country: Country) -> URL:
-        """Export URL for given country."""
-        url = self.url_export_rest_of_world
-        if country.alpha_2 in {"US", "CA", "MX"}:
-            url = self.url_export_north_america
-        return url % {"country": country.name}
+    def urls_export(
+        self,
+        query: ExportQuery,
+    ) -> set[URL]:
+        """Generate export URLs for given query."""
+        mode_map: dict[Mode, ModeJSON] = {
+            Mode.ANALOG: "analog",
+            Mode.DMR: "DMR",
+            Mode.NXDN: "NXDN",
+            Mode.P25: "P25",
+            Mode.TETRA: "tetra",
+        }
+        emergency_map: dict[Emergency, EmergencyJSON] = {
+            Emergency.ARES: "ARES",
+            Emergency.RACES: "RACES",
+            Emergency.SKYWARN: "SKYWARN",
+            Emergency.CANWARN: "CANWARN",
+        }
+        type_map: dict[ServiceType, ServiceTypeJSON] = {
+            ServiceType.GMRS: "GMRS",
+        }
 
-    async def export_json(self, country: Country) -> ExportJson:
-        """Export data for given country."""
-        data: ExportJson = await fetch_json(
-            self.url_export(country=country),
+        query_na = ExportNorthAmericaQuery(
+            callsign=list(query.callsigns),
+            city=list(query.cities),
+            landmark=list(query.landmarks),
+            country=[country.name for country in query.countries],
+            frequency=[str(frequency) for frequency in query.frequencies],
+            mode=[mode_map[mode] for mode in query.modes],
+            state_id=list(query.state_ids),
+            county=list(query.counties),
+            emcomm=[emergency_map[emergency] for emergency in query.emergency_services],
+            stype=[type_map[service_type] for service_type in query.service_types],
+        )
+        query_na = cast(
+            "ExportNorthAmericaQuery", {k: v for k, v in query_na.items() if v}
+        )
+
+        query_world = ExportWorldQuery(
+            callsign=list(query.callsigns),
+            city=list(query.cities),
+            landmark=list(query.landmarks),
+            country=[country.name for country in query.countries],
+            frequency=[str(frequency) for frequency in query.frequencies],
+            mode=[mode_map[mode] for mode in query.modes],
+            region=list(query.regions),
+        )
+        query_world = cast(
+            "ExportWorldQuery", {k: v for k, v in query_world.items() if v}
+        )
+
+        return {
+            #' self.url_export_north_america % cast("dict[str, str]", query_na),
+            self.url_export_rest_of_world % cast("dict[str, str]", query_world),
+        }
+
+    async def export_json(self, url: URL) -> ExportJSON:
+        """Export data for given URL."""
+        data: ExportJSON | ExportErrorJSON = await fetch_json(
+            url,
             headers={"User-Agent": f"{self.app_name} <{self.app_email}>"},
-            cache_dir=self.working_dir,
+            cache_dir=await self.cache_dir(),
         )
 
         if not isinstance(data, dict):
@@ -195,6 +307,8 @@ class RepeaterBook:
         if "count" not in data or "results" not in data:
             raise ValueError
 
+        data = cast("ExportJSON", data)
+
         if data["count"] >= self.MAX_COUNT:
             logger.warning(
                 "Reached max count for API response. Response may have been trimmed."
@@ -205,10 +319,25 @@ class RepeaterBook:
 
         return data
 
-    async def download(self, country: str) -> None:
+    async def export_multi_json(self, urls: set[URL]) -> list[ExportJSON]:
+        """Export data for given URLs."""
+        tasks = [self.export_json(url) for url in urls]
+        return await asyncio.gather(*tasks)
+
+    async def download(self, query: ExportQuery) -> None:
         """Download data and populate internal database."""
-        data = await self.export_json(country=country)
+        data = await self.export_multi_json(self.urls_export(query))
+
+        results: list[RepeaterJSON] = []
+        for export in data:
+            results.extend(export["results"])
+
+        self.init_db()
 
         repeaters: list[Repeater] = []
-        for result in data["results"]:
-            repeaters.append(json_to_model(result))
+        with Session(self.engine) as session:
+            for result in results:
+                repeater = json_to_model(result)
+                session.add(repeater)
+                repeaters.append(repeater)
+            session.commit()

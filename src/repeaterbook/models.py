@@ -4,12 +4,27 @@
 from __future__ import annotations
 
 __all__: list[str] = [
-    "ExportJson",
+    "Emergency",
+    "EmergencyJSON",
+    "ErrorJSON",
+    "ExportBaseQuery",
+    "ExportErrorJSON",
+    "ExportJSON",
+    "ExportNorthAmericaQuery",
+    "ExportQuery",
+    "ExportWorldQuery",
+    "Mode",
+    "ModeJSON",
     "Repeater",
-    "RepeaterJson",
+    "RepeaterJSON",
+    "ServiceType",
+    "ServiceTypeJSON",
     "Status",
+    "StatusJSON",
     "Use",
-    "YesNo",
+    "UseJSON",
+    "YesNoJSON",
+    "ZeroOneJSON",
 ]
 
 from datetime import date
@@ -17,6 +32,8 @@ from decimal import Decimal
 from enum import Enum, auto
 from typing import Literal, TypeAlias, TypedDict
 
+import attrs
+from pycountry.db import Country  # noqa: TC002
 from sqlmodel import Field, SQLModel
 
 
@@ -36,148 +53,29 @@ class Use(Enum):
     CLOSED = auto()
 
 
-class NorthAmerica(str, Enum):
-    UNITED_STATES = "United States"
-    CANADA = "Canada"
-    MEXICO = "Mexico"
+class Mode(Enum):
+    """Mode."""
+
+    ANALOG = auto()
+    DMR = auto()
+    NXDN = auto()
+    P25 = auto()
+    TETRA = auto()
 
 
-class Europe(str, Enum):
-    ALBANIA = "Albania"
-    ANDORRA = "Andorra"
-    AUSTRIA = "Austria"
-    BELARUS = "Belarus"
-    BELGIUM = "Belgium"
-    BOSNIA_AND_HERZEGOVINA = "Bosnia and Herzegovina"
-    BULGARIA = "Bulgaria"
-    CROATIA = "Croatia"
-    CYPRUS = "Cyprus"
-    CZECH_REPUBLIC = "Czech Republic"
-    DENMARK = "Denmark"
-    ESTONIA = "Estonia"
-    FAROE_ISLANDS = "Faroe Islands"
-    FINLAND = "Finland"
-    FRANCE = "France"
-    GEORGIA = "Georgia"
-    GERMANY = "Germany"
-    GIBRALTAR = "Gibraltar"
-    GUERNSEY = "Guernsey"
-    GREECE = "Greece"
-    HUNGARY = "Hungary"
-    ICELAND = "Iceland"
-    ISLE_OF_MAN = "Isle of Man"
-    IRELAND = "Ireland"
-    ITALY = "Italy"
-    JERSEY = "Jersey"
-    KOSOVO = "Kosovo"
-    LATVIA = "Latvia"
-    LIECHTENSTEIN = "Liechtenstein"
-    LITHUANIA = "Lithuania"
-    LUXEMBOURG = "Luxembourg"
-    MALTA = "Malta"
-    MOLDOVA = "Moldova"
-    NETHERLANDS = "Netherlands"
-    NORWAY = "Norway"
-    NORTH_MACEDONIA = "North Macedonia"
-    POLAND = "Poland"
-    PORTUGAL = "Portugal"
-    ROMANIA = "Romania"
-    RUSSIAN_FEDERATION = "Russian Federation"
-    SAN_MARINO = "San Marino"
-    SERBIA = "Serbia"
-    SLOVAKIA = "Slovakia"
-    SLOVENIA = "Slovenia"
-    SPAIN = "Spain"
-    SWEDEN = "Sweden"
-    SWITZERLAND = "Switzerland"
-    UKRAINE = "Ukraine"
-    UNITED_KINGDOM = "United Kingdom"
+class Emergency(Enum):
+    """Emergency."""
+
+    ARES = auto()
+    RACES = auto()
+    SKYWARN = auto()
+    CANWARN = auto()
 
 
-class Eurasia(str, Enum):
-    AZERBAIJAN = "Azerbaijan"
+class ServiceType(Enum):
+    """Service type."""
 
-
-class Asia(str, Enum):
-    CHINA = "China"
-    INDIA = "India"
-    INDONESIA = "Indonesia"
-    ISRAEL = "Israel"
-    JAPAN = "Japan"
-    JORDAN = "Jordan"
-    KUWAIT = "Kuwait"
-    MALAYSIA = "Malaysia"
-    NEPAL = "Nepal"
-    OMAN = "Oman"
-    PAKISTAN = "Pakistan"
-    PHILIPPINES = "Philippines"
-    SINGAPORE = "Singapore"
-    SOUTH_KOREA = "South Korea"
-    SRI_LANKA = "Sri Lanka"
-    THAILAND = "Thailand"
-    TURKEY = "Turkey"
-    TAIWAN = "Taiwan"
-    UNITED_ARAB_EMIRATES = "United Arab Emirates"
-
-
-class SouthAmerica(str, Enum):
-    ARGENTINA = "Argentina"
-    BOLIVIA = "Bolivia"
-    BRAZIL = "Brazil"
-    CARIBBEAN_NETHERLANDS = "Caribbean Netherlands"
-    CHILE = "Chile"
-    COLOMBIA = "Colombia"
-    CURACAO = "Curacao"
-    ECUADOR = "Ecuador"
-    PARAGUAY = "Paraguay"
-    PERU = "Peru"
-    URUGUAY = "Uruguay"
-    VENEZUELA = "Venezuela"
-
-
-class Australia(str, Enum):
-    AUSTRALIA = "Australia"
-
-
-class Africa(str, Enum):
-    MOROCCO = "Morocco"
-    NAMIBIA = "Namibia"
-    SOUTH_AFRICA = "South Africa"
-
-
-class Panama(str, Enum):
-    PANAMA = "Panama"
-
-
-class Oceania(str, Enum):
-    NEW_ZEALAND = "New Zealand"
-
-
-class Hispanola(str, Enum):
-    DOMINICAN_REPUBLIC = "Dominican Republic"
-
-
-class Caribbean(str, Enum):
-    ANGUILLA = "Anguilla"
-    ANTIGUA_AND_BARBUDA = "Antigua and Barbuda"
-    BAHAMAS = "Bahamas"
-    BARBADOS = "Barbados"
-    BELIZE = "Belize"
-    COSTA_RICA = "Costa Rica"
-    CAYMAN_ISLANDS = "Cayman Islands"
-    DOMINICA = "Dominica"
-    EL_SALVADOR = "El Salvador"
-    GRENADA = "Grenada"
-    GUATEMALA = "Guatemala"
-    HAITI = "Haiti"
-    HONDURAS = "Honduras"
-    JAMAICA = "Jamaica"
-    MONTSERRAT = "Montserrat"
-    NICARAGUA = "Nicaragua"
-    SAINT_KITTS_AND_NEVIS = "Saint Kitts and Nevis"
-    SAINT_VINCENT_AND_THE_GRENADINES = "Saint Vincent and the Grenadines"
-    SINT_MAARTEN = "Sint Maarten"
-    TRINIDAD_AND_TOBAGO = "Trinidad and Tobago"
+    GMRS = auto()
 
 
 class Repeater(SQLModel, table=True):
@@ -232,11 +130,43 @@ class Repeater(SQLModel, table=True):
     last_update: date
 
 
-YesNo: TypeAlias = Literal["Yes", "No"]
+ZeroOneJSON: TypeAlias = Literal[
+    0,
+    1,
+]
+YesNoJSON: TypeAlias = Literal[
+    "Yes",
+    "No",
+]
+UseJSON: TypeAlias = Literal[
+    "OPEN",
+    "PRIVATE",
+    "CLOSED",
+]
+StatusJSON: TypeAlias = Literal[
+    "Off-air",
+    "On-air",
+    "Unknown",
+]
+ErrorJSON: TypeAlias = Literal["error"]
+ModeJSON: TypeAlias = Literal[
+    "analog",
+    "DMR",
+    "NXDN",
+    "P25",
+    "tetra",
+]
+EmergencyJSON: TypeAlias = Literal[
+    "ARES",
+    "RACES",
+    "SKYWARN",
+    "CANWARN",
+]
+ServiceTypeJSON: TypeAlias = Literal["GMRS"]
 
 
-RepeaterJson = TypedDict(
-    "RepeaterJson",
+RepeaterJSON = TypedDict(
+    "RepeaterJSON",
     {
         "State ID": str,
         "Rptr ID": int,
@@ -251,39 +181,109 @@ RepeaterJson = TypedDict(
         "Country": str,
         "Lat": str,
         "Long": str,
-        "Precise": Literal[0, 1],
+        "Precise": ZeroOneJSON,
         "Callsign": str,
-        "Use": Literal["OPEN", "PRIVATE", "CLOSED"],
-        "Operational Status": Literal["Off-air", "On-air", "Unknown"],
+        "Use": UseJSON,
+        "Operational Status": StatusJSON,
         "AllStar Node": str,
         "EchoLink Node": str | int,
         "IRLP Node": str,
         "Wires Node": str,
-        "FM Analog": YesNo,
+        "FM Analog": YesNoJSON,
         "FM Bandwidth": str,
-        "DMR": YesNo,
+        "DMR": YesNoJSON,
         "DMR Color Code": str,
         "DMR ID": str | int,
-        "D-Star": YesNo,
-        "NXDN": YesNo,
-        "APCO P-25": YesNo,
+        "D-Star": YesNoJSON,
+        "NXDN": YesNoJSON,
+        "APCO P-25": YesNoJSON,
         "P-25 NAC": str,
-        "M17": YesNo,
+        "M17": YesNoJSON,
         "M17 CAN": str,
-        "Tetra": YesNo,
+        "Tetra": YesNoJSON,
         "Tetra MCC": str,
         "Tetra MNC": str,
-        "System Fusion": YesNo,
+        "System Fusion": YesNoJSON,
         "Notes": str,
         "Last Update": str,
     },
 )
 
 
-class ExportJson(TypedDict, total=False):
+class ExportJSON(TypedDict):
     """RepeaterBook API export response."""
 
     count: int
-    results: list[RepeaterJson]
-    status: Literal["error"]
+    results: list[RepeaterJSON]
+
+
+class ExportErrorJSON(TypedDict):
+    """RepeaterBook API export error response."""
+
+    status: ErrorJSON
     message: str
+
+
+class ExportBaseQuery(TypedDict, total=False):
+    """RepeaterBook API export query.
+
+    `%` - wildcard
+    """
+
+    callsign: list[str]
+    """Repeater callsign."""
+    city: list[str]
+    """Repeater city."""
+    landmark: list[str]
+    country: list[str]
+    """Repeater country."""
+    frequency: list[str]
+    """Repeater frequency."""
+    mode: list[ModeJSON]
+    """Repeater operating mode (analog, DMR, NXDN, P25, tetra)."""
+
+
+class ExportNorthAmericaQuery(ExportBaseQuery, total=False):
+    """RepeaterBook API export North America query.
+
+    `%` - wildcard
+    """
+
+    state_id: list[str]
+    """State / province."""
+    county: list[str]
+    """Repeater county."""
+    emcomm: list[EmergencyJSON]
+    """ARES, RACES, SKYWARN, CANWARN."""
+    stype: list[ServiceTypeJSON]
+    """Service type. Only required when searching for GMRS repeaters."""
+
+
+class ExportWorldQuery(ExportBaseQuery, total=False):
+    """RepeaterBook API export World query.
+
+    `%` - wildcard
+    """
+
+    region: list[str]
+    """Repeater region (if available)."""
+
+
+@attrs.frozen
+class ExportQuery:
+    """RepeaterBook API export query.
+
+    `%` - wildcard
+    """
+
+    callsigns: frozenset[str] = frozenset()
+    cities: frozenset[str] = frozenset()
+    landmarks: frozenset[str] = frozenset()
+    countries: frozenset[Country] = frozenset()
+    frequencies: frozenset[Decimal] = frozenset()
+    modes: frozenset[Mode] = frozenset()
+    state_ids: frozenset[str] = frozenset()
+    counties: frozenset[str] = frozenset()
+    emergency_services: frozenset[Emergency] = frozenset()
+    service_types: frozenset[ServiceType] = frozenset()
+    regions: frozenset[str] = frozenset()
