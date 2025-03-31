@@ -17,13 +17,14 @@ import json
 import time
 from datetime import date, timedelta
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Final, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Final, NamedTuple, cast
 
 import aiohttp
 import attrs
 from anyio import Path
+from haversine import Unit, haversine  # type: ignore[import-untyped]
 from loguru import logger
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 from tqdm import tqdm
 from yarl import URL
 
@@ -44,6 +45,7 @@ from repeaterbook.models import (
     Status,
     Use,
 )
+from repeaterbook.utils import LatLon, square_bounds
 
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy import Engine
@@ -186,7 +188,7 @@ class RepeaterBook:
     working_dir: Path = attrs.Factory(lambda: Path())
     database: str = "repeaterbook.db"
 
-    MAX_COUNT: ClassVar = 3500
+    MAX_COUNT: ClassVar[int] = 3500
 
     async def cache_dir(self) -> Path:
         """Cache directory for API responses."""
@@ -324,7 +326,7 @@ class RepeaterBook:
         tasks = [self.export_json(url) for url in urls]
         return await asyncio.gather(*tasks)
 
-    async def download(self, query: ExportQuery) -> None:
+    async def download(self, query: ExportQuery) -> list[Repeater]:
         """Download data and populate internal database."""
         data = await self.export_multi_json(self.urls_export(query))
 
@@ -341,3 +343,54 @@ class RepeaterBook:
                 session.add(repeater)
                 repeaters.append(repeater)
             session.commit()
+
+        logger.info(f"Downloaded {len(repeaters)} repeaters.")
+        return repeaters
+
+    def find_nearest(
+        self,
+        latitude: float,
+        longitude: float,
+        *,
+        max_distance: float = 80.0,
+        unit: Unit = Unit.KILOMETERS,
+    ) -> list[Repeater]:
+        """Find repeaters within a given distance."""
+
+        class RepDist(NamedTuple):
+            """Repeater distance."""
+
+            repeater: Repeater
+            distance: float
+
+        rep_dists: list[RepDist] = []
+        with Session(self.engine) as session:
+            # Calculate the square bounds for the given distance.
+            bounds = square_bounds(LatLon(latitude, longitude), max_distance, unit=unit)
+            statement = select(Repeater).where(
+                Repeater.latitude >= bounds.south,
+                Repeater.latitude <= bounds.north,
+                Repeater.longitude >= bounds.west,
+                Repeater.longitude <= bounds.east,
+            )
+            for repeater in session.exec(statement):
+                # Calculate the distance to the repeater.
+                distance = haversine(
+                    (latitude, longitude),
+                    (repeater.latitude, repeater.longitude),
+                    unit=unit,
+                )
+
+                if distance <= max_distance:
+                    rep_dists.append(RepDist(repeater=repeater, distance=distance))
+
+        # Sort by distance.
+        rep_dists.sort(key=lambda x: x.distance)
+
+        # Log the number of repeaters found.
+        logger.info(
+            f"Found {len(rep_dists)} repeaters within {max_distance} {unit.name}."
+        )
+
+        # Convert to a list of repeaters.
+        return [rep_dist.repeater for rep_dist in rep_dists]
