@@ -185,7 +185,7 @@ class RepeaterBook:
     app_name: str = "RepeaterBook Python SDK"
     app_email: str = "micael@jarniac.dev"
 
-    working_dir: Path = attrs.Factory(lambda: Path())
+    working_dir: Path = attrs.Factory(Path)
     database: str = "repeaterbook.db"
 
     MAX_COUNT: ClassVar[int] = 3500
