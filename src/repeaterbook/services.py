@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-__all__: list[str] = [
+__all__: tuple[str, ...] = (
     "BOOL_MAP",
     "STATUS_MAP",
     "USE_MAP",
     "RepeaterBook",
     "fetch_json",
     "json_to_model",
-]
+)
 
 import asyncio
 import hashlib

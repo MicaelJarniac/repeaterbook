@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-__all__: list[str] = [
+__all__: tuple[str, ...] = (
     "LatLon",
     "SquareBounds",
     "square_bounds",
-]
+)
 
 from typing import NamedTuple
 

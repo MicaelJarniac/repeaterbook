@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-__all__: list[str] = [
+__all__: tuple[str, ...] = (
     "Emergency",
     "EmergencyJSON",
     "ErrorJSON",
@@ -25,7 +25,7 @@ __all__: list[str] = [
     "UseJSON",
     "YesNoJSON",
     "ZeroOneJSON",
-]
+)
 
 from datetime import date
 from decimal import Decimal
