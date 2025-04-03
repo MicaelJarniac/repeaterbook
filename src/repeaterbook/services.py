@@ -340,7 +340,7 @@ class RepeaterBook:
         with Session(self.engine) as session:
             for result in results:
                 repeater = json_to_model(result)
-                session.add(repeater)
+                session.merge(repeater)
                 repeaters.append(repeater)
             session.commit()
 
