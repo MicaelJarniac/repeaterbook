@@ -6,7 +6,7 @@ __all__: tuple[str, ...] = (
     "BOOL_MAP",
     "STATUS_MAP",
     "USE_MAP",
-    "RepeaterBook",
+    "RepeaterBookAPI",
     "fetch_json",
     "json_to_model",
 )
@@ -16,15 +16,12 @@ import hashlib
 import json
 import time
 from datetime import date, timedelta
-from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Final, NamedTuple, cast
+from typing import Any, ClassVar, Final, cast
 
 import aiohttp
 import attrs
 from anyio import Path
-from haversine import Unit, haversine  # type: ignore[import-untyped]
 from loguru import logger
-from sqlmodel import Session, SQLModel, create_engine, select
 from tqdm import tqdm
 from yarl import URL
 
@@ -45,10 +42,6 @@ from repeaterbook.models import (
     Status,
     Use,
 )
-from repeaterbook.utils import LatLon, square_bounds
-
-if TYPE_CHECKING:  # pragma: no cover
-    from sqlalchemy import Engine
 
 
 async def fetch_json(
@@ -178,7 +171,7 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
 
 
 @attrs.frozen
-class RepeaterBook:
+class RepeaterBookAPI:
     """RepeaterBook API client."""
 
     base_url: URL = attrs.Factory(lambda: URL("https://repeaterbook.com"))
@@ -186,7 +179,6 @@ class RepeaterBook:
     app_email: str = "micael@jarniac.dev"
 
     working_dir: Path = attrs.Factory(Path)
-    database: str = "repeaterbook.db"
 
     MAX_COUNT: ClassVar[int] = 3500
 
@@ -201,25 +193,6 @@ class RepeaterBook:
                 logger.info("Creating .gitignore file.")
                 await gitignore.write_text("*\n", encoding="utf-8")
         return cache
-
-    @property
-    def database_path(self) -> Path:
-        """Database path."""
-        return self.working_dir / self.database
-
-    @property
-    def database_uri(self) -> str:
-        """Database URI."""
-        return f"sqlite:///{self.database_path}"
-
-    @cached_property
-    def engine(self) -> Engine:
-        """Create database engine."""
-        return create_engine(self.database_uri)
-
-    def init_db(self) -> None:
-        """Initialize database."""
-        SQLModel.metadata.create_all(self.engine)
 
     @property
     def url_api(self) -> URL:
@@ -327,70 +300,14 @@ class RepeaterBook:
         return await asyncio.gather(*tasks)
 
     async def download(self, query: ExportQuery) -> list[Repeater]:
-        """Download data and populate internal database."""
+        """Download repeaters."""
         data = await self.export_multi_json(self.urls_export(query))
 
         results: list[RepeaterJSON] = []
         for export in data:
             results.extend(export["results"])
 
-        self.init_db()
-
-        repeaters: list[Repeater] = []
-        with Session(self.engine) as session:
-            for result in results:
-                repeater = json_to_model(result)
-                session.merge(repeater)
-                repeaters.append(repeater)
-            session.commit()
+        repeaters = [json_to_model(result) for result in results]
 
         logger.info(f"Downloaded {len(repeaters)} repeaters.")
         return repeaters
-
-    def find_nearest(
-        self,
-        latitude: float,
-        longitude: float,
-        *,
-        max_distance: float = 80.0,
-        unit: Unit = Unit.KILOMETERS,
-    ) -> list[Repeater]:
-        """Find repeaters within a given distance."""
-
-        class RepDist(NamedTuple):
-            """Repeater distance."""
-
-            repeater: Repeater
-            distance: float
-
-        rep_dists: list[RepDist] = []
-        with Session(self.engine) as session:
-            # Calculate the square bounds for the given distance.
-            bounds = square_bounds(LatLon(latitude, longitude), max_distance, unit=unit)
-            statement = select(Repeater).where(
-                Repeater.latitude >= bounds.south,
-                Repeater.latitude <= bounds.north,
-                Repeater.longitude >= bounds.west,
-                Repeater.longitude <= bounds.east,
-            )
-            for repeater in session.exec(statement):
-                # Calculate the distance to the repeater.
-                distance = haversine(
-                    (latitude, longitude),
-                    (repeater.latitude, repeater.longitude),
-                    unit=unit,
-                )
-
-                if distance <= max_distance:
-                    rep_dists.append(RepDist(repeater=repeater, distance=distance))
-
-        # Sort by distance.
-        rep_dists.sort(key=lambda x: x.distance)
-
-        # Log the number of repeaters found.
-        logger.info(
-            f"Found {len(rep_dists)} repeaters within {max_distance} {unit.name}."
-        )
-
-        # Convert to a list of repeaters.
-        return [rep_dist.repeater for rep_dist in rep_dists]

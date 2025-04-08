@@ -83,22 +83,22 @@ class Repeater(SQLModel, table=True):
 
     state_id: str = Field(primary_key=True)
     repeater_id: int = Field(primary_key=True)
-    frequency: Decimal
-    input_frequency: Decimal
+    frequency: Decimal = Field(index=True)
+    input_frequency: Decimal = Field(index=True)
     pl_ctcss_uplink: str | None
     pl_ctcss_tsq_downlink: str | None
     location_nearest_city: str
     landmark: str | None
     region: str | None
-    country: str | None
+    country: str | None = Field(index=True)
     county: str | None
     state: str | None
-    latitude: Decimal
-    longitude: Decimal
+    latitude: Decimal = Field(index=True)
+    longitude: Decimal = Field(index=True)
     precise: bool
     callsign: str | None
-    use_membership: Use
-    operational_status: Status
+    use_membership: Use = Field(index=True)
+    operational_status: Status = Field(index=True)
     ares: str | None
     races: str | None
     skywarn: str | None
@@ -108,23 +108,23 @@ class Repeater(SQLModel, table=True):
     echolink_node: str | None
     irlp_node: str | None
     wires_node: str | None
-    dmr_capable: bool
+    dmr_capable: bool = Field(index=True)
     dmr_id: str | None
     dmr_color_code: str | None
-    d_star_capable: bool
-    nxdn_capable: bool
-    apco_p_25_capable: bool
+    d_star_capable: bool = Field(index=True)
+    nxdn_capable: bool = Field(index=True)
+    apco_p_25_capable: bool = Field(index=True)
     p_25_nac: str | None
-    m17_capable: bool
+    m17_capable: bool = Field(index=True)
     m17_can: str | None
-    tetra_capable: bool
+    tetra_capable: bool = Field(index=True)
     tetra_mcc: str | None
     tetra_mnc: str | None
-    yaesu_system_fusion_capable: bool
+    yaesu_system_fusion_capable: bool = Field(index=True)
     ysf_digital_id_uplink: str | None
     ysf_digital_id_downlink: str | None
     ysf_dsc: str | None
-    analog_capable: bool
+    analog_capable: bool = Field(index=True)
     fm_bandwidth: Decimal | None
     notes: str | None
     last_update: date
