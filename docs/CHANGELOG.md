@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.2.1 (2025-04-09)
+
+
 ## v0.2.0 (2025-04-08)
+
+### Bug Fixes
+
+- Use `and_` for `square` query
+  ([`9c09b5e`](https://github.com/MicaelJarniac/repeaterbook/commit/9c09b5eff8a2a4cef3dda91d5fa4d44001b0f241))
 
 ### Features
 
