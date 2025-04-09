@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.2.0 (2025-04-08)
+
+### Features
+
+- Queries
+  ([`78972e5`](https://github.com/MicaelJarniac/repeaterbook/commit/78972e5cbdcd150dd9e6435d5dd5c759bb22f96b))
+
+
 ## v0.1.1 (2025-04-03)
 
 ### Bug Fixes
