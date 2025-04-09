@@ -172,7 +172,10 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
 
 @attrs.frozen
 class RepeaterBookAPI:
-    """RepeaterBook API client."""
+    """RepeaterBook API client.
+
+    Must read https://www.repeaterbook.com/wiki/doku.php?id=api before using.
+    """
 
     base_url: URL = attrs.Factory(lambda: URL("https://repeaterbook.com"))
     app_name: str = "RepeaterBook Python SDK"

@@ -81,6 +81,10 @@ Python utility to work with data from RepeaterBook.
 
 Read RepeaterBook's official [API documentation](https://www.repeaterbook.com/wiki/doku.php?id=api) for more information.
 
+## Related Projects
+- https://github.com/MicaelJarniac/opengd77
+- https://github.com/MicaelJarniac/ogdrb
+
 ## See Also
 - https://github.com/afourney/hamkit/tree/main/packages/repeaterbook
 - https://github.com/desertblade/OpenGD77-Repeaterbook
