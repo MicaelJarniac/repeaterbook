@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from haversine import haversine  # type: ignore[import-untyped]
 from loguru import logger
-from sqlmodel import or_
+from sqlmodel import and_, or_
 
 from repeaterbook.models import Repeater
 from repeaterbook.utils import Radius, square_bounds
@@ -24,17 +24,16 @@ from repeaterbook.utils import Radius, square_bounds
 if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Iterable
 
-    from sqlalchemy.sql._typing import _ColumnExpressionArgument
     from sqlalchemy.sql.elements import ColumnElement
 
 
-def square(radius: Radius) -> tuple[_ColumnExpressionArgument[bool] | bool, ...]:
+def square(radius: Radius) -> ColumnElement[bool]:
     """Return a query for repeaters within a given square.
 
     Note: This is a square, not a circle. Use `filter_radius` afterwards.
     """
     bounds = square_bounds(radius=radius)
-    return (
+    return and_(
         Repeater.latitude >= bounds.south,
         Repeater.latitude <= bounds.north,
         Repeater.longitude >= bounds.west,
