@@ -143,6 +143,14 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             return ""
         return str(v)
 
+    def b(key: str, *, default: bool = False) -> bool:
+        """Parse RepeaterBook boolean-ish fields.
+
+        RepeaterBook uses a mix of "Yes"/"No" strings and 1/0 ints.
+        Missing/unknown values fall back to `default`.
+        """
+        return BOOL_MAP.get(j.get(key), default)
+
     return Repeater.model_validate(
         Repeater(
             state_id=s("State ID"),
@@ -175,23 +183,21 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             echolink_node=s("EchoLink Node") or None,
             irlp_node=s("IRLP Node") or None,
             wires_node=s("Wires Node") or None,
-            analog_capable=BOOL_MAP.get(j.get("FM Analog", "No"), False),
+            analog_capable=b("FM Analog", default=False),
             fm_bandwidth=s("FM Bandwidth").replace(" kHz", "") or None,
-            dmr_capable=BOOL_MAP.get(j.get("DMR", "No"), False),
+            dmr_capable=b("DMR", default=False),
             dmr_color_code=s("DMR Color Code") or None,
             dmr_id=s("DMR ID") or None,
-            d_star_capable=BOOL_MAP.get(j.get("D-Star", "No"), False),
-            nxdn_capable=BOOL_MAP.get(j.get("NXDN", "No"), False),
-            apco_p_25_capable=BOOL_MAP.get(j.get("APCO P-25", "No"), False),
+            d_star_capable=b("D-Star", default=False),
+            nxdn_capable=b("NXDN", default=False),
+            apco_p_25_capable=b("APCO P-25", default=False),
             p_25_nac=s("P-25 NAC") or None,
-            m17_capable=BOOL_MAP.get(j.get("M17", "No"), False),
+            m17_capable=b("M17", default=False),
             m17_can=s("M17 CAN") or None,
-            tetra_capable=BOOL_MAP.get(j.get("Tetra", "No"), False),
+            tetra_capable=b("Tetra", default=False),
             tetra_mcc=s("Tetra MCC") or None,
             tetra_mnc=s("Tetra MNC") or None,
-            yaesu_system_fusion_capable=BOOL_MAP.get(
-                j.get("System Fusion", "No"), False
-            ),
+            yaesu_system_fusion_capable=b("System Fusion", default=False),
             notes=s("Notes") or None,
             last_update=parse_date(s("Last Update")),
         )
