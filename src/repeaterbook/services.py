@@ -107,6 +107,7 @@ USE_MAP: Final = {
     "OPEN": Use.OPEN,
     "PRIVATE": Use.PRIVATE,
     "CLOSED": Use.CLOSED,
+    "": Use.OPEN,  # Some export payloads include empty Use; treat as OPEN.
 }
 
 STATUS_MAP: Final = {
@@ -125,47 +126,74 @@ def parse_date(date_str: str) -> date:
 
 
 def json_to_model(j: RepeaterJSON, /) -> Repeater:
-    """Converts a JSON object to a Repeater model."""
+    """Converts a JSON object to a Repeater model.
+
+    RepeaterBook export payloads vary slightly between endpoints.
+
+    - `exportROW.php` may include extra keys like `sponsor`.
+    - `export.php` (North America) includes keys like `County`/`ARES`/… and may omit
+      `Region`.
+
+    This function should be resilient to those differences.
+    """
+
+    def s(key: str) -> str:
+        v = j.get(key, "")
+        if v is None:
+            return ""
+        return str(v)
+
     return Repeater.model_validate(
         Repeater(
-            state_id=j["State ID"],
-            repeater_id=j["Rptr ID"],
-            frequency=j["Frequency"],
-            input_frequency=j["Input Freq"],
-            pl_ctcss_uplink=j["PL"] or None,
-            pl_ctcss_tsq_downlink=j["TSQ"] or None,
-            location_nearest_city=j["Nearest City"],
-            landmark=j["Landmark"] or None,
-            region=j["Region"],
-            state=j["State"],
-            country=j["Country"],
-            latitude=j["Lat"],
-            longitude=j["Long"],
-            precise=BOOL_MAP[j["Precise"]],
-            callsign=j["Callsign"],
-            use_membership=USE_MAP[j["Use"]],
-            operational_status=STATUS_MAP[j["Operational Status"]],
-            allstar_node=j["AllStar Node"],
-            echolink_node=str(j["EchoLink Node"]) or None,
-            irlp_node=j["IRLP Node"] or None,
-            wires_node=j["Wires Node"] or None,
-            analog_capable=BOOL_MAP[j["FM Analog"]],
-            fm_bandwidth=j["FM Bandwidth"].replace(" kHz", "") or None,
-            dmr_capable=BOOL_MAP[j["DMR"]],
-            dmr_color_code=j["DMR Color Code"] or None,
-            dmr_id=str(j["DMR ID"]) or None,
-            d_star_capable=BOOL_MAP[j["D-Star"]],
-            nxdn_capable=BOOL_MAP[j["NXDN"]],
-            apco_p_25_capable=BOOL_MAP[j["APCO P-25"]],
-            p_25_nac=j["P-25 NAC"] or None,
-            m17_capable=BOOL_MAP[j["M17"]],
-            m17_can=j["M17 CAN"] or None,
-            tetra_capable=BOOL_MAP[j["Tetra"]],
-            tetra_mcc=j["Tetra MCC"] or None,
-            tetra_mnc=j["Tetra MNC"] or None,
-            yaesu_system_fusion_capable=BOOL_MAP[j["System Fusion"]],
-            notes=j["Notes"] or None,
-            last_update=parse_date(j["Last Update"]),
+            state_id=s("State ID"),
+            repeater_id=int(j.get("Rptr ID", 0) or 0),
+            frequency=s("Frequency"),
+            input_frequency=s("Input Freq"),
+            pl_ctcss_uplink=s("PL") or None,
+            pl_ctcss_tsq_downlink=s("TSQ") or None,
+            location_nearest_city=s("Nearest City"),
+            landmark=s("Landmark") or None,
+            region=(j.get("Region") if "Region" in j else None),
+            country=s("Country") or None,
+            county=s("County") or None,
+            state=s("State") or None,
+            latitude=s("Lat"),
+            longitude=s("Long"),
+            precise=BOOL_MAP[j.get("Precise", 0)],
+            callsign=s("Callsign") or None,
+            use_membership=USE_MAP.get(s("Use"), Use.OPEN),
+            operational_status=(
+                STATUS_MAP[s("Operational Status")]
+                if s("Operational Status")
+                else Status.UNKNOWN
+            ),
+            ares=s("ARES") or None,
+            races=s("RACES") or None,
+            skywarn=s("SKYWARN") or None,
+            canwarn=s("CANWARN") or None,
+            allstar_node=s("AllStar Node") or None,
+            echolink_node=s("EchoLink Node") or None,
+            irlp_node=s("IRLP Node") or None,
+            wires_node=s("Wires Node") or None,
+            analog_capable=BOOL_MAP.get(j.get("FM Analog", "No"), False),
+            fm_bandwidth=s("FM Bandwidth").replace(" kHz", "") or None,
+            dmr_capable=BOOL_MAP.get(j.get("DMR", "No"), False),
+            dmr_color_code=s("DMR Color Code") or None,
+            dmr_id=s("DMR ID") or None,
+            d_star_capable=BOOL_MAP.get(j.get("D-Star", "No"), False),
+            nxdn_capable=BOOL_MAP.get(j.get("NXDN", "No"), False),
+            apco_p_25_capable=BOOL_MAP.get(j.get("APCO P-25", "No"), False),
+            p_25_nac=s("P-25 NAC") or None,
+            m17_capable=BOOL_MAP.get(j.get("M17", "No"), False),
+            m17_can=s("M17 CAN") or None,
+            tetra_capable=BOOL_MAP.get(j.get("Tetra", "No"), False),
+            tetra_mcc=s("Tetra MCC") or None,
+            tetra_mnc=s("Tetra MNC") or None,
+            yaesu_system_fusion_capable=BOOL_MAP.get(
+                j.get("System Fusion", "No"), False
+            ),
+            notes=s("Notes") or None,
+            last_update=parse_date(s("Last Update")),
         )
     )
 

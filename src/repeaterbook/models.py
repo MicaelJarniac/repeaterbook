@@ -165,6 +165,11 @@ EmergencyJSON: TypeAlias = Literal[
 ServiceTypeJSON: TypeAlias = Literal["GMRS"]
 
 
+# RepeaterBook has some variability between North America vs ROW exports.
+# In practice, fields can appear/disappear (e.g. NA includes County/ARES/... and
+# omits Region; ROW can include extra keys like "sponsor").
+#
+# Keep this TypedDict intentionally permissive for runtime robustness.
 RepeaterJSON = TypedDict(
     "RepeaterJSON",
     {
@@ -179,6 +184,11 @@ RepeaterJSON = TypedDict(
         "Region": str | None,
         "State": str,
         "Country": str,
+        "County": str,
+        "ARES": str,
+        "RACES": str,
+        "SKYWARN": str,
+        "CANWARN": str,
         "Lat": str,
         "Long": str,
         "Precise": ZeroOneJSON,
@@ -206,7 +216,9 @@ RepeaterJSON = TypedDict(
         "System Fusion": YesNoJSON,
         "Notes": str,
         "Last Update": str,
+        "sponsor": object,
     },
+    total=False,
 )
 
 
