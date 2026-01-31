@@ -1,7 +1,26 @@
 # CHANGELOG
 
 
+## v0.2.2 (2026-01-31)
+
+### Bug Fixes
+
+- Tolerate RepeaterBook API drift ([#2](https://github.com/MicaelJarniac/repeaterbook/pull/2),
+  [`665d78e`](https://github.com/MicaelJarniac/repeaterbook/commit/665d78ee38ca856a242b8f5f6289c441f00193a2))
+
+* fix: tolerate RepeaterBook API drift (sponsor, NA fields, empty Use)
+
+* refactor: simplify Region parsing (use .get)
+
+* refactor: add b() helper for Yes/No + 1/0 fields
+
+
 ## v0.2.1 (2025-04-09)
+
+### Chores
+
+- Links
+  ([`1d93cdb`](https://github.com/MicaelJarniac/repeaterbook/commit/1d93cdb5ae7dff17a6cb9943e66b2111f39617b5))
 
 
 ## v0.2.0 (2025-04-08)
