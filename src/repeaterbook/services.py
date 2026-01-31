@@ -153,7 +153,7 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             pl_ctcss_tsq_downlink=s("TSQ") or None,
             location_nearest_city=s("Nearest City"),
             landmark=s("Landmark") or None,
-            region=(j.get("Region") if "Region" in j else None),
+            region=j.get("Region"),
             country=s("Country") or None,
             county=s("County") or None,
             state=s("State") or None,
