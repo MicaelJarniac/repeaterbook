@@ -6,9 +6,12 @@ These tests are *offline*: they spin up a local aiohttp server.
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path as StdPath
 from aiohttp import web
 from anyio import Path
 from yarl import URL
@@ -17,7 +20,7 @@ from repeaterbook.services import fetch_json
 
 
 @pytest.mark.anyio
-async def test_fetch_json_uses_cache_when_fresh(tmp_path: Any) -> None:
+async def test_fetch_json_uses_cache_when_fresh(tmp_path: StdPath) -> None:
     """Second call should hit cache even if server would return different data."""
     state: dict[str, int] = {"calls": 0}
 
@@ -35,7 +38,7 @@ async def test_fetch_json_uses_cache_when_fresh(tmp_path: Any) -> None:
 
     try:
         # Pick the first bound port.
-        port = site._server.sockets[0].getsockname()[1]  # type: ignore[attr-defined]
+        port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]  # noqa: SLF001
         url = URL.build(scheme="http", host="127.0.0.1", port=port, path="/data")
 
         cache_dir = Path(tmp_path) / "cache"
@@ -52,7 +55,7 @@ async def test_fetch_json_uses_cache_when_fresh(tmp_path: Any) -> None:
 
 
 @pytest.mark.anyio
-async def test_fetch_json_refreshes_cache_when_stale(tmp_path: Any) -> None:
+async def test_fetch_json_refreshes_cache_when_stale(tmp_path: StdPath) -> None:
     """If cache is stale, a new request should be made."""
     state: dict[str, int] = {"calls": 0}
 
@@ -69,7 +72,7 @@ async def test_fetch_json_refreshes_cache_when_stale(tmp_path: Any) -> None:
     await site.start()
 
     try:
-        port = site._server.sockets[0].getsockname()[1]  # type: ignore[attr-defined]
+        port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]  # noqa: SLF001
         url = URL.build(scheme="http", host="127.0.0.1", port=port, path="/data")
 
         cache_dir = Path(tmp_path) / "cache"
@@ -78,10 +81,13 @@ async def test_fetch_json_refreshes_cache_when_stale(tmp_path: Any) -> None:
         first = await fetch_json(url, cache_dir=cache_dir)
 
         # Force staleness by setting max_cache_age=0.
-        second = await fetch_json(url, cache_dir=cache_dir, max_cache_age=timedelta(seconds=0))
+        second = await fetch_json(
+            url, cache_dir=cache_dir, max_cache_age=timedelta(seconds=0)
+        )
 
+        expected_refreshed_count = 2
         assert first == {"calls": 1}
-        assert second == {"calls": 2}
-        assert state["calls"] == 2
+        assert second == {"calls": expected_refreshed_count}
+        assert state["calls"] == expected_refreshed_count
     finally:
         await runner.cleanup()

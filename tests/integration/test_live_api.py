@@ -10,9 +10,12 @@ Enable with:
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path as StdPath
 from anyio import Path
 from yarl import URL
 
@@ -31,7 +34,10 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.mark.integration
 @pytest.mark.anyio
-async def test_live_export_row_brazil_downloads_and_parses(tmp_path: Any) -> None:
+async def test_live_export_row_brazil_downloads_and_parses(
+    tmp_path: StdPath,
+) -> None:
+    """Brazil repeaters download and parse correctly from ROW endpoint."""
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
         app_email="micael@jarniac.dev",
@@ -50,7 +56,9 @@ async def test_live_export_row_brazil_downloads_and_parses(tmp_path: Any) -> Non
 
 @pytest.mark.integration
 @pytest.mark.anyio
-async def test_live_export_north_america_payload_parses_first_rows(tmp_path: Any) -> None:
+async def test_live_export_north_america_payload_parses_first_rows(
+    tmp_path: StdPath,
+) -> None:
     """NA payload shape differs; ensure json_to_model handles it.
 
     We don't route NA through urls_export() yet, so we call export.php directly.
