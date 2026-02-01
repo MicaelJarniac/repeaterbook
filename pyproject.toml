@@ -159,6 +159,9 @@ command_line = "-m pytest"
 
 [tool.pytest.ini_options]
 # addopts = "--cov"
+markers = [
+  "integration: hits the live repeaterbook.com API (disabled by default)",
+]
 
 [tool.inline-snapshot]
 format-command = "ruff format --stdin-filename {filename}"
