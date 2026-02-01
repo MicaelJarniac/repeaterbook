@@ -12,19 +12,24 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+import pycountry
 import pytest
 
 if TYPE_CHECKING:
     from pathlib import Path as StdPath
+
 from anyio import Path
 from yarl import URL
 
 from repeaterbook.models import ExportQuery
 from repeaterbook.services import RepeaterBookAPI, json_to_model
 
+# Limit parsed rows in NA test to keep runtime reasonable.
+_NA_SAMPLE_SIZE = 200
+
 
 def _live_enabled() -> bool:
-    return os.environ.get("REPEATERBOOK_LIVE") in {"1", "true", "TRUE", "yes", "YES"}
+    return os.environ.get("REPEATERBOOK_LIVE", "").lower() in {"1", "true", "yes"}
 
 
 pytestmark = pytest.mark.skipif(
@@ -45,8 +50,6 @@ async def test_live_export_row_brazil_downloads_and_parses(
     )
 
     # Brazil is served by ROW endpoint.
-    import pycountry
-
     q = ExportQuery(countries=frozenset({pycountry.countries.lookup("Brazil")}))
     reps = await api.download(q)
 
@@ -79,6 +82,6 @@ async def test_live_export_north_america_payload_parses_first_rows(
     assert payload["count"] > 0
 
     # Parse a small sample so the test stays fast.
-    for row in payload["results"][:200]:
+    for row in payload["results"][:_NA_SAMPLE_SIZE]:
         rep = json_to_model(row)
         assert rep.country in {"United States", "USA", "United States of America"}
