@@ -113,7 +113,7 @@ print(f"Found {len(results)} open repeaters")
 
 # Print first 5 repeaters
 for repeater in results[:5]:
-    print(f"{repeater.frequency:.4f} MHz - {repeater.callsign} - {repeater.location}")
+    print(f"{repeater.frequency:.4f} MHz - {repeater.callsign} - {repeater.location_nearest_city}")
 ```
 
 ### 4. Geographic Queries
@@ -125,8 +125,9 @@ from repeaterbook.utils import LatLon, Radius
 from repeaterbook.queries import filter_radius, square
 
 # Define a search area (São Paulo, Brazil)
+sao_paulo = LatLon(lat=-23.5505, lon=-46.6333)
 radius = Radius(
-    origin=LatLon(latitude=-23.5505, longitude=-46.6333),
+    origin=sao_paulo,
     distance=50  # kilometers
 )
 
@@ -138,9 +139,12 @@ nearby_exact = filter_radius(nearby, radius)
 
 print(f"Found {len(nearby_exact)} repeaters within 50km of São Paulo")
 
-# Print repeaters sorted by distance
-for repeater in sorted(nearby_exact, key=lambda r: r.distance)[:5]:
-    print(f"{repeater.distance:.1f}km - {repeater.frequency:.4f} MHz - {repeater.callsign}")
+# Print repeaters with distances
+# filter_radius returns repeaters sorted by distance, but doesn't add distance attribute
+from haversine import haversine
+for repeater in nearby_exact[:5]:
+    distance = haversine(sao_paulo, (repeater.latitude, repeater.longitude))
+    print(f"{distance:.1f}km - {repeater.frequency:.4f} MHz - {repeater.callsign}")
 ```
 
 ### 5. Filter by Capabilities
@@ -163,7 +167,7 @@ for repeater in dmr_repeaters[:5]:
     modes = []
     if repeater.dmr_capable:
         modes.append("DMR")
-    if repeater.p25_capable:
+    if repeater.apco_p_25_capable:
         modes.append("P25")
     if repeater.nxdn_capable:
         modes.append("NXDN")
@@ -200,7 +204,7 @@ async def main():
     rb.populate(repeaters)
 
     # 3. Find DMR repeaters near São Paulo
-    sao_paulo = LatLon(latitude=-23.5505, longitude=-46.6333)
+    sao_paulo = LatLon(lat=-23.5505, lon=-46.6333)
     radius = Radius(origin=sao_paulo, distance=50)
 
     nearby = rb.query(
@@ -214,8 +218,12 @@ async def main():
     nearby_filtered = filter_radius(nearby, radius)
 
     print(f"\nFound {len(nearby_filtered)} DMR repeaters within 50km:")
-    for rep in sorted(nearby_filtered, key=lambda r: r.distance)[:10]:
-        print(f"  {rep.distance:5.1f}km - {rep.frequency:.4f} MHz - {rep.callsign:8s} - {rep.location}")
+    # filter_radius returns repeaters sorted by distance
+    # Calculate distances for display
+    from haversine import haversine
+    for rep in nearby_filtered[:10]:
+        distance = haversine(radius.origin, (rep.latitude, rep.longitude), unit=radius.unit)
+        print(f"  {distance:5.1f}km - {rep.frequency:.4f} MHz - {rep.callsign:8s} - {rep.location_nearest_city}")
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -248,7 +256,7 @@ from repeaterbook.models import ExportQuery
 import pycountry
 
 usa = pycountry.countries.get(alpha_2="US")
-query = ExportQuery(countries={usa}, states={"California", "Nevada"})
+query = ExportQuery(countries={usa}, state_ids={"California", "Nevada"})
 repeaters = await api.download(query=query)
 ```
 
@@ -256,7 +264,7 @@ repeaters = await api.download(query=query)
 
 ```python
 digital_repeaters = rb.query(
-    (Repeater.dmr_capable | Repeater.p25_capable | Repeater.nxdn_capable),
+    (Repeater.dmr_capable | Repeater.apco_p_25_capable | Repeater.nxdn_capable),
     Repeater.operational_status == Status.ON_AIR
 )
 ```

@@ -215,7 +215,7 @@ nearby = filter_radius(candidates, radius)
 query = ExportQuery(countries={usa})  # Slow!
 
 # Download specific states
-query = ExportQuery(countries={usa}, states={"California"})  # Faster
+query = ExportQuery(countries={usa}, state_ids={"California"})  # Faster
 ```
 
 ### Queries are slow
@@ -359,7 +359,7 @@ results = rb.query(Repeater.operational_status == Status.ON_AIR)
 
 ### Why is DMR color code sometimes None?
 
-Not all DMR repeaters report their color code. Common defaults:
+Not all DMR repeaters report their color code. Note that the `dmr_color_code` field is a string, not an integer. Common defaults:
 
 - **Color Code 1**: Most common default
 - **Color Code 2**: Also common
@@ -372,7 +372,7 @@ These are capability flags:
 
 - `analog_capable=True`: Supports FM analog
 - `dmr_capable=True`: Supports DMR
-- `p25_capable=True`: Supports P25
+- `apco_p_25_capable=True`: Supports P25
 - etc.
 
 A repeater can have multiple flags (e.g., dual-mode).

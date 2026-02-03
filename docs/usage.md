@@ -55,7 +55,7 @@ async def download_example():
     repeaters = await api.download(
         query=ExportQuery(
             countries={usa},
-            states={"California", "Oregon", "Washington"}
+            state_ids={"California", "Oregon", "Washington"}
         )
     )
 
@@ -109,7 +109,7 @@ query = ExportQuery(
 # By country and state
 query = ExportQuery(
     countries={pycountry.countries.get(alpha_2="US")},
-    states={"Texas", "Oklahoma", "New Mexico"}
+    state_ids={"Texas", "Oklahoma", "New Mexico"}
 )
 
 # Multiple countries
@@ -184,7 +184,7 @@ results = rb.query(
 
 # OR conditions
 digital = rb.query(
-    (Repeater.dmr_capable | Repeater.p25_capable | Repeater.nxdn_capable)
+    (Repeater.dmr_capable | Repeater.apco_p_25_capable | Repeater.nxdn_capable)
 )
 
 # Complex queries
@@ -195,7 +195,7 @@ results = rb.query(
         Repeater.operational_status == Status.ON_AIR,
         or_(
             Repeater.dmr_capable == True,
-            Repeater.p25_capable == True
+            Repeater.apco_p_25_capable == True
         )
     )
 )
@@ -211,11 +211,11 @@ Use the provided utility types for geographic data:
 from repeaterbook.utils import LatLon, Radius
 
 # Define a point
-location = LatLon(latitude=51.5074, longitude=-0.1278)  # London
+location = LatLon(lat=51.5074, lon=-0.1278)  # London
 
 # Define a search radius
 radius = Radius(
-    origin=LatLon(latitude=51.5074, longitude=-0.1278),
+    origin=LatLon(lat=51.5074, lon=-0.1278),
     distance=50  # kilometers
 )
 ```
@@ -230,7 +230,7 @@ from repeaterbook.utils import LatLon, Radius
 
 # Define search area
 radius = Radius(
-    origin=LatLon(latitude=51.5074, longitude=-0.1278),
+    origin=LatLon(lat=51.5074, lon=-0.1278),
     distance=50
 )
 
@@ -251,10 +251,15 @@ from repeaterbook.queries import filter_radius
 candidates = rb.query(square(radius))
 
 # Filter by actual distance (uses Haversine formula)
+# filter_radius returns repeaters sorted by distance from origin
 nearby = filter_radius(candidates, radius)
 
-# Sort by distance
-sorted_repeaters = sorted(nearby, key=lambda r: r.distance)
+# Results are already sorted by distance
+# If you need the distance value for display, calculate it:
+from haversine import haversine
+for rep in nearby[:10]:
+    distance = haversine(radius.origin, (rep.latitude, rep.longitude), unit=radius.unit)
+    print(f"{distance:.1f}km - {rep.callsign}")
 ```
 
 ### Distance Units
@@ -327,7 +332,7 @@ The `Repeater` model includes capability flags for different digital modes:
 dmr = rb.query(Repeater.dmr_capable == True)
 
 # P25 repeaters
-p25 = rb.query(Repeater.p25_capable == True)
+p25 = rb.query(Repeater.apco_p_25_capable == True)
 
 # NXDN repeaters
 nxdn = rb.query(Repeater.nxdn_capable == True)
@@ -337,13 +342,13 @@ analog = rb.query(Repeater.analog_capable == True)
 
 # Any digital mode
 digital = rb.query(
-    (Repeater.dmr_capable | Repeater.p25_capable | Repeater.nxdn_capable)
+    (Repeater.dmr_capable | Repeater.apco_p_25_capable | Repeater.nxdn_capable)
 )
 
 # Dual mode (analog + digital)
 dual_mode = rb.query(
     Repeater.analog_capable == True,
-    (Repeater.dmr_capable | Repeater.p25_capable | Repeater.nxdn_capable)
+    (Repeater.dmr_capable | Repeater.apco_p_25_capable | Repeater.nxdn_capable)
 )
 ```
 
@@ -364,21 +369,11 @@ for rep in dmr_repeaters:
 ### P25 Specific Data
 
 ```python
-p25_repeaters = rb.query(Repeater.p25_capable == True)
+p25_repeaters = rb.query(Repeater.apco_p_25_capable == True)
 
 for rep in p25_repeaters:
     print(f"{rep.callsign}:")
-    print(f"  NAC: {rep.p25_nac}")
-```
-
-### NXDN Specific Data
-
-```python
-nxdn_repeaters = rb.query(Repeater.nxdn_capable == True)
-
-for rep in nxdn_repeaters:
-    print(f"{rep.callsign}:")
-    print(f"  RAN: {rep.nxdn_ran}")
+    print(f"  NAC: {rep.p_25_nac}")
 ```
 
 ## Filtering by Access
@@ -398,22 +393,19 @@ private = rb.query(Repeater.use_membership == Use.PRIVATE)
 closed = rb.query(Repeater.use_membership == Use.CLOSED)
 ```
 
-### CTCSS/DCS Tones
+### CTCSS Tones
 
 Filter by required access tones:
 
 ```python
 # Repeaters with CTCSS tone
-with_tone = rb.query(Repeater.input_ctcss != None)
+with_tone = rb.query(Repeater.pl_ctcss_uplink != None)
 
 # Specific CTCSS tone
-tone_110_9 = rb.query(Repeater.input_ctcss == 110.9)
+tone_110_9 = rb.query(Repeater.pl_ctcss_uplink == 110.9)
 
 # No tone required
-no_tone = rb.query(
-    Repeater.input_ctcss == None,
-    Repeater.input_dcs == None
-)
+no_tone = rb.query(Repeater.pl_ctcss_uplink == None)
 ```
 
 ## Status Filtering
@@ -436,13 +428,25 @@ unknown = rb.query(Repeater.operational_status == Status.UNKNOWN)
 ### Emergency Services
 
 ```python
-from repeaterbook.models import Emergency
+# Repeaters with ARES support
+ares = rb.query(Repeater.ares != None)
 
-# Repeaters with emergency services
-emergency = rb.query(Repeater.emergency == Emergency.YES)
+# Repeaters with RACES support
+races = rb.query(Repeater.races != None)
 
-# Repeaters without emergency services
-no_emergency = rb.query(Repeater.emergency == Emergency.NO)
+# Repeaters with SKYWARN support
+skywarn = rb.query(Repeater.skywarn != None)
+
+# Repeaters with CANWARN support
+canwarn = rb.query(Repeater.canwarn != None)
+
+# Any emergency services
+emergency = rb.query(
+    (Repeater.ares != None) |
+    (Repeater.races != None) |
+    (Repeater.skywarn != None) |
+    (Repeater.canwarn != None)
+)
 ```
 
 ## Combining Queries
@@ -457,7 +461,7 @@ from repeaterbook.utils import LatLon, Radius
 from repeaterbook.models import Status, Use
 
 # Location: Chicago, IL
-chicago = LatLon(latitude=41.8781, longitude=-87.6298)
+chicago = LatLon(lat=41.8781, lon=-87.6298)
 radius = Radius(origin=chicago, distance=100)  # 100 km
 
 # Find: Nearby, open, operational, DMR-capable repeaters on 70cm
@@ -469,16 +473,18 @@ results = rb.query(
     band(Bands.CM_70)
 )
 
-# Filter by actual distance and sort
+# Filter by actual distance
+# filter_radius returns repeaters sorted by distance
 nearby = filter_radius(results, radius)
-sorted_results = sorted(nearby, key=lambda r: r.distance)
 
 # Display results
-for rep in sorted_results[:10]:
-    print(f"{rep.distance:5.1f}km - {rep.frequency:.4f} MHz - {rep.callsign}")
-    print(f"  Location: {rep.location}")
+from haversine import haversine
+for rep in nearby[:10]:
+    distance = haversine(radius.origin, (rep.latitude, rep.longitude), unit=radius.unit)
+    print(f"{distance:5.1f}km - {rep.frequency:.4f} MHz - {rep.callsign}")
+    print(f"  Location: {rep.location_nearest_city}")
     print(f"  DMR ID: {rep.dmr_id}, CC: {rep.dmr_color_code}")
-    print(f"  Tone: {rep.input_ctcss or 'None'}")
+    print(f"  Tone: {rep.pl_ctcss_uplink or 'None'}")
     print()
 ```
 
@@ -537,18 +543,22 @@ with open('chirp_import.csv', 'w', newline='') as f:
     writer.writerow(['Location', 'Name', 'Frequency', 'Duplex', 'Offset',
                      'Tone', 'rToneFreq', 'cToneFreq', 'DtcsCode', 'Comment'])
 
-    for rep in sorted(nearby, key=lambda r: r.distance):
+    # filter_radius returns repeaters sorted by distance
+    # Calculate distance for each repeater for display
+    from haversine import haversine
+    for rep in nearby:
+        distance = haversine(radius.origin, (rep.latitude, rep.longitude), unit=radius.unit)
         writer.writerow([
             rep.id,
             rep.callsign,
             rep.frequency,
             '+' if rep.input_frequency < rep.frequency else '-',
             abs(rep.frequency - rep.input_frequency),
-            'Tone' if rep.input_ctcss else '',
-            rep.input_ctcss or '',
-            rep.output_ctcss or '',
-            rep.input_dcs or '',
-            f"{rep.location} - {rep.distance:.1f}km"
+            'Tone' if rep.pl_ctcss_uplink else '',
+            rep.pl_ctcss_uplink or '',
+            rep.pl_ctcss_tsq_downlink or '',
+            '',  # DCS code not available
+            f"{rep.location_nearest_city} - {distance:.1f}km"
         ])
 ```
 
@@ -562,36 +572,37 @@ Key fields available on `Repeater` objects:
 # Identification
 rep.id              # Unique RepeaterBook ID
 rep.callsign        # Repeater callsign
-rep.location        # City/location description
-rep.trustee         # Trustee/sponsor name
+rep.location_nearest_city  # City/location description
 
 # Frequency
 rep.frequency       # Output frequency (MHz)
 rep.input_frequency # Input frequency (MHz)
 
-# Access
-rep.input_ctcss     # Input CTCSS tone (Hz)
-rep.output_ctcss    # Output CTCSS tone (Hz)
-rep.input_dcs       # Input DCS code
-rep.output_dcs      # Output DCS code
+# Access (CTCSS tones)
+rep.pl_ctcss_uplink        # Input CTCSS/PL tone (Hz)
+rep.pl_ctcss_tsq_downlink  # Output CTCSS/TSQ tone (Hz)
 
 # Status
 rep.operational_status  # ON_AIR, OFF_AIR, UNKNOWN
 rep.use_membership      # OPEN, PRIVATE, CLOSED
-rep.emergency           # YES, NO, UNKNOWN
+
+# Emergency Services (string fields)
+rep.ares            # ARES support indicator
+rep.races           # RACES support indicator
+rep.skywarn         # SKYWARN support indicator
+rep.canwarn         # CANWARN support indicator
 
 # Capabilities
-rep.analog_capable  # Boolean
-rep.dmr_capable     # Boolean
-rep.p25_capable     # Boolean
-rep.nxdn_capable    # Boolean
-rep.tetra_capable   # Boolean
+rep.analog_capable       # Boolean
+rep.dmr_capable          # Boolean
+rep.apco_p_25_capable    # Boolean (P25)
+rep.nxdn_capable         # Boolean
+rep.tetra_capable        # Boolean
 
 # Digital mode details
 rep.dmr_id          # DMR radio ID
 rep.dmr_color_code  # DMR color code (0-15)
-rep.p25_nac         # P25 NAC code
-rep.nxdn_ran        # NXDN RAN code
+rep.p_25_nac        # P25 NAC code
 
 # Location
 rep.latitude        # Latitude (degrees)
@@ -612,14 +623,12 @@ def describe_repeater(rep):
     """Print a detailed description of a repeater."""
     print(f"=== {rep.callsign} ===")
     print(f"Frequency: {rep.frequency:.4f} MHz ({rep.input_frequency:.4f} MHz)")
-    print(f"Location: {rep.location}")
+    print(f"Location: {rep.location_nearest_city}")
     print(f"Coordinates: {rep.latitude:.4f}, {rep.longitude:.4f}")
 
     # Access
-    if rep.input_ctcss:
-        print(f"CTCSS: {rep.input_ctcss} Hz")
-    if rep.input_dcs:
-        print(f"DCS: {rep.input_dcs}")
+    if rep.pl_ctcss_uplink:
+        print(f"CTCSS: {rep.pl_ctcss_uplink} Hz")
 
     # Modes
     modes = []
@@ -627,8 +636,8 @@ def describe_repeater(rep):
         modes.append("FM")
     if rep.dmr_capable:
         modes.append(f"DMR (CC{rep.dmr_color_code})")
-    if rep.p25_capable:
-        modes.append(f"P25 (NAC ${rep.p25_nac:03X})")
+    if rep.apco_p_25_capable:
+        modes.append(f"P25 (NAC ${rep.p_25_nac:03X})")
     if rep.nxdn_capable:
         modes.append("NXDN")
 
@@ -663,18 +672,18 @@ nearby = filter_radius(all_repeaters, radius)
 
 ### Limit Query Results
 
-Use SQL LIMIT for large result sets:
+For large result sets, consider using additional filters to narrow down results:
 
 ```python
-from sqlmodel import select
+# Query with multiple filters to reduce result size
+results = rb.query(
+    Repeater.operational_status == Status.ON_AIR,
+    Repeater.use_membership == Use.OPEN,
+    band(Bands.M_2)
+)
 
-# Get first 100 results
-statement = select(Repeater).where(
-    Repeater.operational_status == Status.ON_AIR
-).limit(100)
-
-with rb.session as session:
-    results = session.exec(statement).all()
+# Or use Python slicing on results
+results = rb.query(Repeater.operational_status == Status.ON_AIR)[:100]
 ```
 
 ### Cache API Responses

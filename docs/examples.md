@@ -51,7 +51,7 @@ def search_repeaters():
     band_filter = request.args.get('band')  # '2m', '70cm', etc.
 
     # Build query
-    radius = Radius(origin=LatLon(lat, lon), distance=distance)
+    radius = Radius(origin=LatLon(lat=lat, lon=lon), distance=distance)
     conditions = [
         square(radius),
         Repeater.operational_status == Status.ON_AIR
@@ -61,7 +61,7 @@ def search_repeaters():
     if mode == 'dmr':
         conditions.append(Repeater.dmr_capable == True)
     elif mode == 'p25':
-        conditions.append(Repeater.p25_capable == True)
+        conditions.append(Repeater.apco_p_25_capable == True)
     elif mode == 'nxdn':
         conditions.append(Repeater.nxdn_capable == True)
 
@@ -75,16 +75,18 @@ def search_repeaters():
     results = rb.query(*conditions)
     nearby = filter_radius(results, radius)
 
-    # Sort by distance
-    sorted_results = sorted(nearby, key=lambda r: r.distance)[:50]
+    # filter_radius returns repeaters sorted by distance
+    # Limit to first 50 results
+    sorted_results = nearby[:50]
 
     # Convert to JSON
+    from haversine import haversine
     return jsonify([{
         'callsign': r.callsign,
         'frequency': r.frequency,
-        'location': r.location,
-        'distance': round(r.distance, 2),
-        'ctcss': r.input_ctcss,
+        'location': r.location_nearest_city,
+        'distance': round(haversine(radius.origin, (r.latitude, r.longitude), unit=radius.unit), 2),
+        'ctcss': r.pl_ctcss_uplink,
         'dmr': r.dmr_capable,
         'dmr_id': r.dmr_id,
         'dmr_cc': r.dmr_color_code,
@@ -119,7 +121,7 @@ async def generate_codeplug():
     api = RepeaterBookAPI()
     usa = pycountry.countries.get(alpha_2="US")
     repeaters = await api.download(
-        query=ExportQuery(countries={usa}, states={"California"})
+        query=ExportQuery(countries={usa}, state_ids={"California"})
     )
 
     # Store in database
@@ -127,7 +129,7 @@ async def generate_codeplug():
     rb.populate(repeaters)
 
     # Find DMR repeaters near San Francisco
-    sf = LatLon(latitude=37.7749, longitude=-122.4194)
+    sf = LatLon(lat=37.7749, lon=-122.4194)
     radius = Radius(origin=sf, distance=100)
 
     dmr_repeaters = rb.query(
@@ -139,7 +141,7 @@ async def generate_codeplug():
     )
 
     nearby_dmr = filter_radius(dmr_repeaters, radius)
-    sorted_repeaters = sorted(nearby_dmr, key=lambda r: r.distance)
+    # filter_radius returns repeaters sorted by distance
 
     # Generate CSV for Anytone/TYT radios
     with open('dmr_codeplug.csv', 'w', newline='') as f:
@@ -156,12 +158,12 @@ async def generate_codeplug():
         ])
 
         # Data rows
-        for idx, rep in enumerate(sorted_repeaters[:100], start=1):
+        for idx, rep in enumerate(nearby_dmr[:100], start=1):
             # Calculate offset
             offset = rep.frequency - rep.input_frequency
 
             # Channel name
-            name = f"{rep.callsign} {rep.location[:20]}"
+            name = f"{rep.callsign} {rep.location_nearest_city[:20]}"
 
             writer.writerow([
                 idx,                          # No.
@@ -171,8 +173,8 @@ async def generate_codeplug():
                 'D-Digital',                  # Channel Type
                 'High',                       # Transmit Power
                 '12.5K',                      # Band Width
-                f"{rep.input_ctcss:.1f}" if rep.input_ctcss else '',  # CTCSS Decode
-                f"{rep.input_ctcss:.1f}" if rep.input_ctcss else '',  # CTCSS Encode
+                f"{rep.pl_ctcss_uplink:.1f}" if rep.pl_ctcss_uplink else '',  # CTCSS Decode
+                f"{rep.pl_ctcss_uplink:.1f}" if rep.pl_ctcss_uplink else '',  # CTCSS Encode
                 'Worldwide',                  # Contact
                 'Group Call',                 # Contact Call Type
                 'None',                       # Radio ID
@@ -188,7 +190,7 @@ async def generate_codeplug():
                 'None'                        # Emergency System
             ])
 
-    print(f"Generated codeplug with {len(sorted_repeaters[:100])} channels")
+    print(f"Generated codeplug with {len(nearby_dmr[:100])} channels")
     print(f"Import dmr_codeplug.csv into your radio programming software")
 
 if __name__ == '__main__':
@@ -236,7 +238,7 @@ async def create_coverage_map():
         if rep.dmr_capable:
             color = 'blue'
             icon = 'info-sign'
-        elif rep.p25_capable:
+        elif rep.apco_p_25_capable:
             color = 'green'
             icon = 'info-sign'
         elif rep.nxdn_capable:
@@ -251,8 +253,8 @@ async def create_coverage_map():
         <div style="width:200px">
             <h4>{rep.callsign}</h4>
             <p><b>Frequency:</b> {rep.frequency:.4f} MHz</p>
-            <p><b>Location:</b> {rep.location}</p>
-            <p><b>Input Tone:</b> {rep.input_ctcss or 'None'}</p>
+            <p><b>Location:</b> {rep.location_nearest_city}</p>
+            <p><b>Input Tone:</b> {rep.pl_ctcss_uplink or 'None'}</p>
             <p><b>Use:</b> {rep.use_membership.value}</p>
         </div>
         """
@@ -329,7 +331,7 @@ async def generate_statistics():
 
     print(f"\nDigital Mode Capabilities:")
     print(f"DMR: {df['dmr_capable'].sum()}")
-    print(f"P25: {df['p25_capable'].sum()}")
+    print(f"P25: {df['apco_p_25_capable'].sum()}")
     print(f"NXDN: {df['nxdn_capable'].sum()}")
     print(f"Analog: {df['analog_capable'].sum()}")
 
@@ -352,7 +354,7 @@ async def generate_statistics():
     # 3. Digital modes bar chart
     modes = {
         'DMR': df['dmr_capable'].sum(),
-        'P25': df['p25_capable'].sum(),
+        'P25': df['apco_p_25_capable'].sum(),
         'NXDN': df['nxdn_capable'].sum(),
         'Analog': df['analog_capable'].sum(),
     }
@@ -424,12 +426,13 @@ class TravelPlanner:
             candidates = self.rb.query(*conditions)
             nearby = filter_radius(candidates, radius)
 
-            # Sort by distance
-            sorted_repeaters = sorted(nearby, key=lambda r: r.distance)[:5]
+            # filter_radius returns repeaters sorted by distance
+            # Take top 5 closest
+            closest_repeaters = nearby[:5]
 
             results[f"Waypoint {idx + 1}"] = {
                 'location': waypoint,
-                'repeaters': sorted_repeaters
+                'repeaters': closest_repeaters
             }
 
         return results
@@ -447,11 +450,14 @@ class TravelPlanner:
             report.append(f"\nTop Repeaters:")
 
             for rep in data['repeaters']:
+                # Calculate distance for display
+                from haversine import haversine
+                distance = haversine(data['location'], (rep.latitude, rep.longitude))
                 report.append(f"\n  {rep.callsign} - {rep.frequency:.4f} MHz")
-                report.append(f"  Location: {rep.location}")
-                report.append(f"  Distance: {rep.distance:.1f} km")
-                if rep.input_ctcss:
-                    report.append(f"  Tone: {rep.input_ctcss} Hz")
+                report.append(f"  Location: {rep.location_nearest_city}")
+                report.append(f"  Distance: {distance:.1f} km")
+                if rep.pl_ctcss_uplink:
+                    report.append(f"  Tone: {rep.pl_ctcss_uplink} Hz")
                 if rep.dmr_capable:
                     report.append(f"  DMR: CC{rep.dmr_color_code}, ID {rep.dmr_id}")
                 report.append(f"  Notes: {rep.notes or 'None'}")
@@ -470,7 +476,7 @@ async def plan_road_trip():
 
     print("Downloading repeater data...")
     repeaters = await api.download(
-        query=ExportQuery(countries={usa}, states=states)
+        query=ExportQuery(countries={usa}, state_ids=states)
     )
 
     # Initialize database
@@ -479,10 +485,10 @@ async def plan_road_trip():
 
     # Define route (San Francisco to Las Vegas to Phoenix)
     route = [
-        LatLon(37.7749, -122.4194),  # San Francisco
-        LatLon(39.5296, -119.8138),  # Reno
-        LatLon(36.1699, -115.1398),  # Las Vegas
-        LatLon(33.4484, -112.0740),  # Phoenix
+        LatLon(lat=37.7749, lon=-122.4194),  # San Francisco
+        LatLon(lat=39.5296, lon=-119.8138),  # Reno
+        LatLon(lat=36.1699, lon=-115.1398),  # Las Vegas
+        LatLon(lat=33.4484, lon=-112.0740),  # Phoenix
     ]
 
     # Create planner
@@ -518,7 +524,7 @@ Identify repeaters with emergency capabilities.
 import asyncio
 from repeaterbook import RepeaterBook, Repeater
 from repeaterbook.services import RepeaterBookAPI
-from repeaterbook.models import ExportQuery, Status, Use, Emergency
+from repeaterbook.models import ExportQuery, Status, Use
 from repeaterbook.queries import square, filter_radius
 from repeaterbook.utils import LatLon, Radius
 import pycountry
@@ -530,17 +536,17 @@ async def emergency_planning():
     api = RepeaterBookAPI()
     usa = pycountry.countries.get(alpha_2="US")
     repeaters = await api.download(
-        query=ExportQuery(countries={usa}, states={"Florida"})
+        query=ExportQuery(countries={usa}, state_ids={"Florida"})
     )
 
     # Initialize database
     rb = RepeaterBook()
     rb.populate(repeaters)
 
-    # Find emergency-capable repeaters
+    # Find emergency-capable repeaters (ARES/RACES/SKYWARN)
     emergency_repeaters = rb.query(
         Repeater.operational_status == Status.ON_AIR,
-        Repeater.emergency == Emergency.YES,
+        (Repeater.ares == True) | (Repeater.races == True) | (Repeater.skywarn == True),
         Repeater.use_membership.in_([Use.OPEN, Use.PRIVATE])
     )
 
@@ -549,7 +555,7 @@ async def emergency_planning():
     # Group by county/location
     by_location = {}
     for rep in emergency_repeaters:
-        location = rep.location
+        location = rep.location_nearest_city
         if location not in by_location:
             by_location[location] = []
         by_location[location].append(rep)
@@ -563,8 +569,8 @@ async def emergency_planning():
         print(f"\n{location}:")
         for rep in sorted(reps, key=lambda r: r.frequency):
             print(f"  {rep.callsign:10s} {rep.frequency:8.4f} MHz", end="")
-            if rep.input_ctcss:
-                print(f"  Tone: {rep.input_ctcss:6.1f}", end="")
+            if rep.pl_ctcss_uplink:
+                print(f"  Tone: {rep.pl_ctcss_uplink:6.1f}", end="")
             print(f"  Use: {rep.use_membership.value}")
             if rep.notes:
                 print(f"    Notes: {rep.notes}")
@@ -575,10 +581,10 @@ async def emergency_planning():
     print("=" * 80)
 
     cities = {
-        "Miami": LatLon(25.7617, -80.1918),
-        "Tampa": LatLon(27.9506, -82.4572),
-        "Orlando": LatLon(28.5383, -81.3792),
-        "Jacksonville": LatLon(30.3322, -81.6557),
+        "Miami": LatLon(lat=25.7617, lon=-80.1918),
+        "Tampa": LatLon(lat=27.9506, lon=-82.4572),
+        "Orlando": LatLon(lat=28.5383, lon=-81.3792),
+        "Jacksonville": LatLon(lat=30.3322, lon=-81.6557),
     }
 
     for city_name, city_loc in cities.items():
@@ -586,7 +592,7 @@ async def emergency_planning():
         candidates = rb.query(
             square(radius),
             Repeater.operational_status == Status.ON_AIR,
-            Repeater.emergency == Emergency.YES
+            (Repeater.ares == True) | (Repeater.races == True) | (Repeater.skywarn == True)
         )
         nearby = filter_radius(candidates, radius)
 
