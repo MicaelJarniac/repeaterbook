@@ -246,19 +246,19 @@ pytest --cov
 
 ### Docs
 
-Sphinx is used to automatically parse docstrings and generate documentation.
+MkDocs Material is used to build the documentation, with mkdocstrings to automatically generate API documentation from docstrings.
 
 ```bash
-# Change dir to /docs
+# Build documentation
+nox -s docs
+
+# Serve documentation locally with live reload
+nox -s docs_serve
+
+# Or use mkdocs directly
 cd docs/
-
-# Update files index
-sphinx-apidoc -f -o ./source ..
-
-# Build HTML docs
-make html
-# On Windows
-./make.bat html
+mkdocs build --strict  # Build HTML docs
+mkdocs serve           # Serve with live reload at http://127.0.0.1:8000
 ```
 
 ### Requirements
