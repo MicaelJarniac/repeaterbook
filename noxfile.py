@@ -97,7 +97,7 @@ def docs(session: nox.Session) -> None:
     session.run("mkdocs", "build", "-f", "docs/mkdocs.yml")
 
 
-@nox.session(python=python_version)
+@nox.session(python=python_version, default=False)
 def docs_serve(session: nox.Session) -> None:
     """Serve documentation locally with live reload."""
     install(session, groups=["docs"], root=True)
