@@ -20,6 +20,7 @@ from typing import Any, ClassVar, Final, cast
 
 import aiohttp
 import attrs
+import pycountry
 from anyio import Path
 from loguru import logger
 from tqdm import tqdm
@@ -136,7 +137,7 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             pl_ctcss_tsq_downlink=j["TSQ"] or None,
             location_nearest_city=j["Nearest City"],
             landmark=j["Landmark"] or None,
-            region=j["Region"],
+            region=j.get("Region"),
             state=j["State"],
             country=j["Country"],
             latitude=j["Lat"],
@@ -152,7 +153,7 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             analog_capable=BOOL_MAP[j["FM Analog"]],
             fm_bandwidth=j["FM Bandwidth"].replace(" kHz", "") or None,
             dmr_capable=BOOL_MAP[j["DMR"]],
-            dmr_color_code=j["DMR Color Code"] or None,
+            dmr_color_code=str(j["DMR Color Code"]) or None,
             dmr_id=str(j["DMR ID"]) or None,
             d_star_capable=BOOL_MAP[j["D-Star"]],
             nxdn_capable=BOOL_MAP[j["NXDN"]],
@@ -161,8 +162,8 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             m17_capable=BOOL_MAP[j["M17"]],
             m17_can=j["M17 CAN"] or None,
             tetra_capable=BOOL_MAP[j["Tetra"]],
-            tetra_mcc=j["Tetra MCC"] or None,
-            tetra_mnc=j["Tetra MNC"] or None,
+            tetra_mcc=str(j["Tetra MCC"]) or None,
+            tetra_mnc=str(j["Tetra MNC"]) or None,
             yaesu_system_fusion_capable=BOOL_MAP[j["System Fusion"]],
             notes=j["Notes"] or None,
             last_update=parse_date(j["Last Update"]),
@@ -233,12 +234,21 @@ class RepeaterBookAPI:
         type_map: dict[ServiceType, ServiceTypeJSON] = {
             ServiceType.GMRS: "GMRS",
         }
+        north_america_countries = {
+            pycountry.countries.get(alpha_2="US"),
+            pycountry.countries.get(alpha_2="CA"),
+            pycountry.countries.get(alpha_2="MX"),
+        }
 
         query_na = ExportNorthAmericaQuery(
             callsign=list(query.callsigns),
             city=list(query.cities),
             landmark=list(query.landmarks),
-            country=[country.name for country in query.countries],
+            country=[
+                country.name
+                for country in query.countries
+                if country in north_america_countries
+            ],
             frequency=[str(frequency) for frequency in query.frequencies],
             mode=[mode_map[mode] for mode in query.modes],
             state_id=list(query.state_ids),
@@ -254,7 +264,11 @@ class RepeaterBookAPI:
             callsign=list(query.callsigns),
             city=list(query.cities),
             landmark=list(query.landmarks),
-            country=[country.name for country in query.countries],
+            country=[
+                country.name
+                for country in query.countries
+                if country not in north_america_countries
+            ],
             frequency=[str(frequency) for frequency in query.frequencies],
             mode=[mode_map[mode] for mode in query.modes],
             region=list(query.regions),
@@ -263,10 +277,20 @@ class RepeaterBookAPI:
             "ExportWorldQuery", {k: v for k, v in query_world.items() if v}
         )
 
-        return {
-            #' self.url_export_north_america % cast("dict[str, str]", query_na),
-            self.url_export_rest_of_world % cast("dict[str, str]", query_world),
-        }
+        out: set[URL] = set()
+        url_na = self.url_export_north_america % cast("dict[str, str]", query_na)
+        url_world = self.url_export_rest_of_world % cast("dict[str, str]", query_world)
+
+        if query.countries:
+            if "country" in query_na:
+                out.add(url_na)
+            if "country" in query_world:
+                out.add(url_world)
+        else:
+            out.add(url_na)
+            out.add(url_world)
+
+        return out
 
     async def export_json(self, url: URL) -> ExportJSON:
         """Export data for given URL."""
