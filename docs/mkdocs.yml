@@ -116,9 +116,15 @@ markdown_extensions:
 
 nav:
   - Home: README.md
+  - Getting Started: getting-started.md
+  - Usage Guide: usage.md
+  - Examples: examples.md
+  - Architecture: architecture.md
+  - FAQ: faq.md
   - Contributing:
     - Guide: CONTRIBUTING.md
     - Code of Conduct: CODE_OF_CONDUCT.md
+    - Changelog: CHANGELOG.md
   - Reference:
     - Tools & Standards: reference.md
     - API Reference: api.md
