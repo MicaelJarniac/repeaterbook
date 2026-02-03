@@ -1,4 +1,4 @@
-<div align="center">
+<div align="center" markdown="1">
 
   [![Discord][badge-chat]][chat]
   <br>
@@ -75,6 +75,9 @@
 <!---->
 
 # RepeaterBook
+
+Welcome to **RepeaterBook's** documentation!
+
 Python utility to work with data from RepeaterBook.
 
 [Read the Docs][docs]

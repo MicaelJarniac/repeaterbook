@@ -37,10 +37,9 @@
     - [airspeed velocity (`asv`)][asv]
     - [Coverage.py][coveragepy] <sup>[config][pyproject_toml]</sup>
   - Documenting
-    - [Sphinx][sphinx] <sup>[config][docs_conf_py]</sup>
-      - [Furo][furo]
-      - [sphinxcontrib-spelling][sphinxcontrib-spelling]
-      - [MyST][myst]
+    - [MkDocs][mkdocs] <sup>[config][docs_mkdocs_yml]</sup>
+      - [Material for MkDocs][mkdocs-material]
+      - [mkdocstrings][mkdocstrings]
     - [Google style docstrings][docstring_google]
   - Building
     - [uv][uv]
@@ -49,7 +48,7 @@
     - [`pyproject.toml`][pyproject_toml]
     - [`.pre-commit-config.yaml`][_pre-commit-config_yaml]
     - [`.editorconfig`][_editorconfig]
-    - [`docs/conf.py`][docs_conf_py]
+    - [`docs/mkdocs.yml`][docs_mkdocs_yml]
     - [`docs/wordlist.txt`][docs_wordlist_txt]
     - [`noxfile.py`][noxfile_py]
 - Standards
@@ -77,7 +76,7 @@
 [_pre-commit-config_yaml]: ../.pre-commit-config.yaml
 [pyproject_toml]: ../pyproject.toml
 [_editorconfig]: ../.editorconfig
-[docs_conf_py]: ./conf.py
+[docs_mkdocs_yml]: ./mkdocs.yml
 [docs_wordlist_txt]: ./wordlist.txt
 [noxfile_py]: ../noxfile.py
 
@@ -100,11 +99,10 @@
 [nox]: https://github.com/wntrblm/nox
 [cruft]: https://github.com/cruft/cruft/
 [cookiecutter]: https://github.com/cookiecutter/cookiecutter
-[sphinx]: https://www.sphinx-doc.org
-[furo]: https://github.com/pradyunsg/furo
-[sphinxcontrib-spelling]: https://github.com/sphinx-contrib/spelling
-[myst]: https://github.com/executablebooks/myst-parser
-[docstring_google]: https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
+[mkdocs]: https://www.mkdocs.org
+[mkdocs-material]: https://squidfunk.github.io/mkdocs-material
+[mkdocstrings]: https://mkdocstrings.github.io
+[docstring_google]: https://mkdocstrings.github.io/griffe/docstrings/#google-style
 [uv]: https://docs.astral.sh/uv
 [conventionalcommits]: https://www.conventionalcommits.org
 [semver]: https://semver.org
