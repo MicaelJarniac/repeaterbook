@@ -1,6 +1,6 @@
 {
   "template": "https://github.com/MicaelJarniac/crustypy",
-  "commit": "c918076893705d3293055b4d0f684a3036b32ee9",
+  "commit": "2f83c0192efdea6c59fc121788bb7b70a0a6b585",
   "checkout": null,
   "context": {
     "cookiecutter": {
@@ -21,7 +21,7 @@
       "__github_url": "https://github.com/MicaelJarniac/repeaterbook",
       "__readthedocs_name": "repeaterbook",
       "_template": "https://github.com/MicaelJarniac/crustypy",
-      "_commit": "c918076893705d3293055b4d0f684a3036b32ee9"
+      "_commit": "2f83c0192efdea6c59fc121788bb7b70a0a6b585"
     }
   },
   "directory": null
