@@ -270,7 +270,7 @@ class TestRepeaterBookAPIUrls:
         query = ExportQuery(countries=frozenset({us}))
         urls = api.urls_export(query)
         assert len(urls) == 1
-        url_str = str(list(urls)[0])
+        url_str = str(next(iter(urls)))
         assert "export.php" in url_str
         assert "exportROW" not in url_str
         assert "United+States" in url_str
@@ -282,7 +282,7 @@ class TestRepeaterBookAPIUrls:
         query = ExportQuery(countries=frozenset({brazil}))
         urls = api.urls_export(query)
         assert len(urls) == 1
-        url_str = str(list(urls)[0])
+        url_str = str(next(iter(urls)))
         assert "exportROW.php" in url_str
         assert "Brazil" in url_str
 
@@ -301,7 +301,7 @@ class TestRepeaterBookAPIUrls:
         query = ExportQuery(state_ids=frozenset({"06"}))
         urls = api.urls_export(query)
         assert len(urls) == 1
-        url_str = str(list(urls)[0])
+        url_str = str(next(iter(urls)))
         assert "export.php" in url_str
         assert "exportROW" not in url_str
         assert "state_id=06" in url_str
@@ -312,7 +312,7 @@ class TestRepeaterBookAPIUrls:
         query = ExportQuery(regions=frozenset({"South America"}))
         urls = api.urls_export(query)
         assert len(urls) == 1
-        url_str = str(list(urls)[0])
+        url_str = str(next(iter(urls)))
         assert "exportROW.php" in url_str
         assert "South+America" in url_str
 
