@@ -256,7 +256,7 @@ from repeaterbook.models import ExportQuery
 import pycountry
 
 usa = pycountry.countries.get(alpha_2="US")
-query = ExportQuery(countries={usa}, state_ids={"California", "Nevada"})
+query = ExportQuery(countries={usa}, state_ids={"06", "32"})  # CA, NV (FIPS codes)
 repeaters = await api.download(query=query)
 ```
 

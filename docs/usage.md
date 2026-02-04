@@ -51,12 +51,12 @@ async def download_example():
         query=ExportQuery(countries=countries)
     )
 
-    # Download by state (USA)
+    # Download by state (USA) - use FIPS codes
     usa = pycountry.countries.get(alpha_2="US")
     repeaters = await api.download(
         query=ExportQuery(
             countries={usa},
-            state_ids={"California", "Oregon", "Washington"}
+            state_ids={"06", "41", "53"}  # CA, OR, WA
         )
     )
 
@@ -107,10 +107,10 @@ query = ExportQuery(
     countries={pycountry.countries.get(name="Japan")}
 )
 
-# By country and state
+# By country and state (use FIPS codes)
 query = ExportQuery(
     countries={pycountry.countries.get(alpha_2="US")},
-    state_ids={"Texas", "Oklahoma", "New Mexico"}
+    state_ids={"48", "40", "35"}  # TX, OK, NM
 )
 
 # Multiple countries

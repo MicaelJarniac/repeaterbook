@@ -215,7 +215,7 @@ nearby = filter_radius(candidates, radius)
 query = ExportQuery(countries={usa})  # Slow!
 
 # Download specific states
-query = ExportQuery(countries={usa}, state_ids={"California"})  # Faster
+query = ExportQuery(countries={usa}, state_ids={"06"})  # California (FIPS code)
 ```
 
 ### Queries are slow

@@ -121,7 +121,7 @@ async def generate_codeplug():
     api = RepeaterBookAPI()
     usa = pycountry.countries.get(alpha_2="US")
     repeaters = await api.download(
-        query=ExportQuery(countries={usa}, state_ids={"California"})
+        query=ExportQuery(countries={usa}, state_ids={"06"})  # California FIPS code
     )
 
     # Store in database
@@ -472,7 +472,8 @@ async def plan_road_trip():
     # Download repeater data
     api = RepeaterBookAPI()
     usa = pycountry.countries.get(alpha_2="US")
-    states = {"California", "Nevada", "Arizona", "Utah"}
+    # FIPS codes: CA=06, NV=32, AZ=04, UT=49
+    states = {"06", "32", "04", "49"}
 
     print("Downloading repeater data...")
     repeaters = await api.download(
@@ -536,7 +537,7 @@ async def emergency_planning():
     api = RepeaterBookAPI()
     usa = pycountry.countries.get(alpha_2="US")
     repeaters = await api.download(
-        query=ExportQuery(countries={usa}, state_ids={"Florida"})
+        query=ExportQuery(countries={usa}, state_ids={"12"})  # Florida FIPS code
     )
 
     # Initialize database
