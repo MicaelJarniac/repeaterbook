@@ -78,52 +78,138 @@
 
 Welcome to **RepeaterBook's** documentation!
 
-Python utility to work with data from RepeaterBook.
+**RepeaterBook** is a Python library that provides a powerful and convenient interface to [RepeaterBook.com](https://www.repeaterbook.com/), the world's largest database of amateur radio repeaters. With this library, you can programmatically download, query, and analyze repeater data for various amateur radio applications.
 
-[Read the Docs][docs]
+## Features
 
-Read RepeaterBook's official [API documentation](https://www.repeaterbook.com/wiki/doku.php?id=api) for more information.
+- **Easy API Access**: Download repeater data from RepeaterBook.com with a simple async interface
+- **Local Database**: Store repeater information in a local SQLite database for fast queries
+- **Geographic Queries**: Find repeaters near a location using distance-based filtering
+- **Band Filtering**: Query repeaters by frequency band (2m, 70cm, etc.)
+- **Digital Mode Support**: Filter by DMR, P25, NXDN, and other digital modes
+- **Smart Caching**: Automatic caching of API responses to reduce load and improve performance
+- **Type Safe**: Fully typed with mypy for excellent IDE support
+- **Async/Await**: Non-blocking I/O for efficient API operations
+
+## Quick Example
+
+```python
+import asyncio
+from repeaterbook import RepeaterBook, Repeater
+from repeaterbook.services import RepeaterBookAPI
+from repeaterbook.models import ExportQuery, Status
+from repeaterbook.utils import LatLon, Radius
+from repeaterbook.queries import filter_radius, square, band, Bands
+import pycountry
+
+async def find_nearby_repeaters():
+    # Download repeater data
+    api = RepeaterBookAPI()
+    brazil = pycountry.countries.get(name="Brazil")
+    repeaters = await api.download(query=ExportQuery(countries={brazil}))
+
+    # Store in local database
+    rb = RepeaterBook()
+    rb.populate(repeaters)
+
+    # Find DMR repeaters within 50km of São Paulo
+    sao_paulo = LatLon(lat=-23.5505, lon=-46.6333)
+    radius = Radius(origin=sao_paulo, distance=50)
+
+    nearby = rb.query(
+        square(radius),
+        Repeater.dmr_capable == True,
+        Repeater.operational_status == Status.ON_AIR,
+        band(Bands.CM_70)  # 70cm band
+    )
+
+    filtered = filter_radius(nearby, radius)
+
+    # Display results (filter_radius returns repeaters sorted by distance)
+    from haversine import haversine
+    for rep in filtered[:5]:
+        distance = haversine(radius.origin, (rep.latitude, rep.longitude), unit=radius.unit)
+        print(f"{distance:.1f}km - {rep.frequency:.4f} MHz - {rep.callsign}")
+
+asyncio.run(find_nearby_repeaters())
+```
+
+## Documentation
+
+- **[Getting Started](getting-started.md)** - Tutorial for beginners
+- **[Usage Guide](usage.md)** - Comprehensive usage examples
+- **[Examples](examples.md)** - Real-world use cases
+- **[Architecture](architecture.md)** - Understanding the internals
+- **[API Reference](api.md)** - Complete API documentation
+- **[FAQ](faq.md)** - Common questions and troubleshooting
+
+[Read the full documentation][docs]
+
+Read RepeaterBook's official [API documentation](https://www.repeaterbook.com/wiki/doku.php?id=api) for more information about the upstream API.
+
+## Use Cases
+
+- **Trip Planning**: Find repeaters along travel routes
+- **Emergency Communications**: Identify emergency-capable repeaters
+- **Radio Programming**: Generate codeplugs for DMR and other digital radios
+- **Coverage Analysis**: Create coverage maps and statistics
+- **Network Analysis**: Analyze repeater networks and infrastructure
+- **Mobile Apps**: Build repeater directory applications
+- **Research**: Analyze amateur radio repeater trends and distributions
 
 ## Related Projects
-- https://github.com/MicaelJarniac/opengd77
-- https://github.com/MicaelJarniac/ogdrb
+
+- [MicaelJarniac/opengd77](https://github.com/MicaelJarniac/opengd77) - OpenGD77 radio programming
+- [MicaelJarniac/ogdrb](https://github.com/MicaelJarniac/ogdrb) - OpenGD77 RepeaterBook integration
 
 ## See Also
-- https://github.com/afourney/hamkit/tree/main/packages/repeaterbook
-- https://github.com/desertblade/OpenGD77-Repeaterbook
-- https://github.com/TomHW/OpenGD77
+
+- [afourney/hamkit](https://github.com/afourney/hamkit/tree/main/packages/repeaterbook) - Ham radio toolkit
+- [desertblade/OpenGD77-Repeaterbook](https://github.com/desertblade/OpenGD77-Repeaterbook) - OpenGD77 integration
+- [TomHW/OpenGD77](https://github.com/TomHW/OpenGD77) - OpenGD77 firmware
 
 ## Installation
 
 ### PyPI
+
 [*repeaterbook*][pypi] is available on PyPI:
 
 ```bash
-# With uv
+# With uv (recommended)
 uv add repeaterbook
+
 # With pip
 pip install repeaterbook
+
 # With Poetry
 poetry add repeaterbook
 ```
 
 ### GitHub
+
 You can also install the latest version of the code directly from GitHub:
+
 ```bash
 # With uv
 uv add git+https://github.com/MicaelJarniac/repeaterbook
+
 # With pip
-pip install git+git://github.com/MicaelJarniac/repeaterbook
+pip install git+https://github.com/MicaelJarniac/repeaterbook
+
 # With Poetry
-poetry add git+git://github.com/MicaelJarniac/repeaterbook
+poetry add git+https://github.com/MicaelJarniac/repeaterbook
 ```
 
-## Usage
-For more examples, see the [full documentation][docs].
+## Requirements
 
-```python
-from repeaterbook import repeaterbook
-```
+- Python 3.10 or higher
+- Dependencies are automatically installed:
+  - aiohttp - Async HTTP client
+  - sqlmodel - SQL ORM with type safety
+  - haversine - Distance calculations
+  - pycountry - Country/region codes
+  - loguru - Structured logging
+  - tqdm - Progress bars
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
