@@ -473,6 +473,48 @@ Include:
 - Error message and stack trace
 - Minimal code to reproduce
 
+## Error Handling
+
+### What exceptions does RepeaterBook raise?
+
+RepeaterBook uses a hierarchy of custom exceptions:
+
+| Exception | When Raised |
+|-----------|------------|
+| `RepeaterBookError` | Base exception for all library errors |
+| `RepeaterBookAPIError` | API returned an error response (status: "error") |
+| `RepeaterBookValidationError` | Invalid data or response format |
+| `RepeaterBookCacheError` | Cache read/write operations failed |
+
+### How do I handle errors properly?
+
+```python
+from repeaterbook import (
+    RepeaterBookError,
+    RepeaterBookAPIError,
+    RepeaterBookValidationError,
+)
+
+try:
+    repeaters = await api.download(query=query)
+except RepeaterBookAPIError as e:
+    print(f"API error: {e}")
+except RepeaterBookValidationError as e:
+    print(f"Invalid data: {e}")
+except RepeaterBookError as e:
+    print(f"Library error: {e}")
+```
+
+### Why did I get a validation error?
+
+The `Repeater` model validates data automatically:
+
+- **Latitude** must be between -90 and 90
+- **Longitude** must be between -180 and 180
+- **Frequency** must be positive
+
+If you're seeing validation errors, the data from the API may be malformed.
+
 ## Troubleshooting
 
 ### Enable debug logging

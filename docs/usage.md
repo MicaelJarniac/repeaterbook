@@ -12,14 +12,15 @@ The `RepeaterBookAPI` class provides access to the RepeaterBook.com API.
 
 ```python
 from repeaterbook.services import RepeaterBookAPI
+from datetime import timedelta
 
 # Create an API client with default settings
 api = RepeaterBookAPI()
 
-# Custom cache directory and TTL
+# Custom configuration
 api = RepeaterBookAPI(
-    cache_dir=".my_cache",
-    cache_ttl=7200  # 2 hours in seconds
+    max_cache_age=timedelta(hours=2),  # Cache responses for 2 hours
+    max_count=5000,  # Expected max results (default: 3500)
 )
 ```
 
@@ -691,11 +692,13 @@ results = rb.query(Repeater.operational_status == Status.ON_AIR)[:100]
 The API client automatically caches, but you can customize:
 
 ```python
+from datetime import timedelta
+
 # Longer cache for stable data
-api = RepeaterBookAPI(cache_ttl=86400)  # 24 hours
+api = RepeaterBookAPI(max_cache_age=timedelta(hours=24))
 
 # Shorter cache for frequently changing data
-api = RepeaterBookAPI(cache_ttl=1800)  # 30 minutes
+api = RepeaterBookAPI(max_cache_age=timedelta(minutes=30))
 ```
 
 ### Reuse Database Connection
@@ -708,6 +711,54 @@ rb = RepeaterBook("repeaters.db")
 results1 = rb.query(band(Bands.M_2))
 results2 = rb.query(band(Bands.CM_70))
 results3 = rb.query(Repeater.dmr_capable == True)
+```
+
+## Error Handling
+
+RepeaterBook provides custom exceptions for robust error handling:
+
+```python
+from repeaterbook import (
+    RepeaterBookError,
+    RepeaterBookAPIError,
+    RepeaterBookCacheError,
+    RepeaterBookValidationError,
+)
+
+try:
+    repeaters = await api.download(query=ExportQuery(countries={brazil}))
+except RepeaterBookAPIError as e:
+    # API returned an error response
+    print(f"API error: {e}")
+except RepeaterBookValidationError as e:
+    # Invalid response format or data
+    print(f"Validation error: {e}")
+except RepeaterBookCacheError as e:
+    # Cache read/write failed
+    print(f"Cache error: {e}")
+except RepeaterBookError as e:
+    # Catch all library errors
+    print(f"RepeaterBook error: {e}")
+```
+
+### Exception Types
+
+| Exception | Description |
+|-----------|-------------|
+| `RepeaterBookError` | Base exception for all library errors |
+| `RepeaterBookAPIError` | API returned an error response |
+| `RepeaterBookValidationError` | Invalid data or response format |
+| `RepeaterBookCacheError` | Cache operations failed |
+
+### Data Validation
+
+The `Repeater` model includes built-in validation:
+
+```python
+# These will raise ValueError if invalid:
+# - Latitude must be between -90 and 90
+# - Longitude must be between -180 and 180
+# - Frequency must be positive
 ```
 
 ## Logging
