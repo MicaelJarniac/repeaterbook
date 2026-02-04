@@ -200,7 +200,7 @@ async def main():
     print(f"Downloaded {len(repeaters)} repeaters")
 
     # 2. Store in database
-    rb = RepeaterBook("my_repeaters.db")
+    rb = RepeaterBook(database="my_repeaters.db")
     rb.populate(repeaters)
 
     # 3. Find DMR repeaters near São Paulo

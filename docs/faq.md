@@ -116,13 +116,13 @@ This occurs when multiple processes access the same database. Solutions:
 
 ```python
 # Good
-rb = RepeaterBook("repeaters.db")
+rb = RepeaterBook(database="repeaters.db")
 results1 = rb.query(...)
 results2 = rb.query(...)
 
 # Bad (multiple instances to same file)
-rb1 = RepeaterBook("repeaters.db")
-rb2 = RepeaterBook("repeaters.db")  # May cause lock
+rb1 = RepeaterBook(database="repeaters.db")
+rb2 = RepeaterBook(database="repeaters.db")  # May cause lock
 ```
 
 ### Queries return empty results

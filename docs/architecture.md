@@ -234,7 +234,7 @@ class RepeaterBook:
 
 ```python
 # Creates tables if they don't exist
-rb = RepeaterBook("repeaters.db")
+rb = RepeaterBook(database="repeaters.db")
 ```
 
 **Populate:**

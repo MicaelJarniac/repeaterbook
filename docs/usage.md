@@ -130,15 +130,16 @@ The `RepeaterBook` class manages a local SQLite database of repeaters:
 
 ```python
 from repeaterbook import RepeaterBook
+from anyio import Path
 
-# Default database file (repeaterbook.db)
+# Default database file (./repeaterbook.db)
 rb = RepeaterBook()
 
-# Custom database file
-rb = RepeaterBook("my_repeaters.db")
+# Custom database file name
+rb = RepeaterBook(database="my_repeaters.db")
 
-# In-memory database (for temporary use)
-rb = RepeaterBook(":memory:")
+# Custom working directory
+rb = RepeaterBook(working_dir=Path("/tmp"), database="repeaters.db")
 ```
 
 ### Populating the Database
@@ -701,7 +702,7 @@ api = RepeaterBookAPI(max_cache_age=timedelta(minutes=30))
 
 ```python
 # Create once
-rb = RepeaterBook("repeaters.db")
+rb = RepeaterBook(database="repeaters.db")
 
 # Reuse for multiple queries
 results1 = rb.query(band(Bands.M_2))

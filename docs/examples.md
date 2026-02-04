@@ -17,7 +17,7 @@ from repeaterbook.utils import LatLon, Radius
 import pycountry
 
 app = Flask(__name__)
-rb = RepeaterBook("repeaters.db")
+rb = RepeaterBook(database="repeaters.db")
 
 async def initialize_database():
     """Download and populate database on startup."""
