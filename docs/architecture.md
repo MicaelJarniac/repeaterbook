@@ -135,16 +135,18 @@ The services module handles API communication and data transformation.
 The main API client class:
 
 ```python
+from datetime import timedelta
+
 class RepeaterBookAPI:
     """Client for RepeaterBook API."""
 
     def __init__(
         self,
-        cache_dir: str = ".repeaterbook_cache",
-        cache_ttl: int = 3600,
+        working_dir: Path = Path(),
+        max_cache_age: timedelta = timedelta(hours=1),
     ):
-        self.cache_dir = Path(cache_dir)
-        self.cache_ttl = cache_ttl
+        self.working_dir = working_dir
+        self.max_cache_age = max_cache_age
 ```
 
 **Features:**
@@ -274,7 +276,7 @@ The queries module provides helper functions for common query patterns.
 ```python
 def square(radius: Radius) -> BinaryExpression:
     """Create bounding box query around a point."""
-    bounds = square_bounds(radius.origin, radius.distance)
+    bounds = square_bounds(radius)  # Takes the full Radius object
 
     return and_(
         Repeater.latitude >= bounds.south,
@@ -293,24 +295,26 @@ def square(radius: Radius) -> BinaryExpression:
 **Radius Filtering:**
 
 ```python
-def filter_radius(repeaters: Sequence[Repeater], radius: Radius) -> list[Repeater]:
-    """Filter repeaters by actual distance from origin."""
-    result = []
+def filter_radius(repeaters: Iterable[Repeater], radius: Radius) -> list[Repeater]:
+    """Filter repeaters by actual distance from origin, sorted by distance."""
+    rep_dists = []
 
     for repeater in repeaters:
         # Calculate great-circle distance
         distance = haversine(
-            (radius.origin.latitude, radius.origin.longitude),
+            radius.origin,  # LatLon is tuple-compatible (lat, lon)
             (repeater.latitude, repeater.longitude),
             unit=radius.unit,
         )
 
         if distance <= radius.distance:
-            # Add distance attribute
-            repeater.distance = distance
-            result.append(repeater)
+            rep_dists.append((repeater, distance))
 
-    return result
+    # Sort by distance
+    rep_dists.sort(key=lambda x: x[1])
+
+    # Return just the repeaters (sorted by distance)
+    return [rep for rep, _ in rep_dists]
 ```
 
 **How it works:**

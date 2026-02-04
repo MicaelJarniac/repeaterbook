@@ -602,20 +602,20 @@ if __name__ == '__main__':
     asyncio.run(emergency_planning())
 ```
 
-## Example 7: Network Analysis
+## Example 7: DMR Repeater Analysis
 
-Analyze repeater networks (Brandmeister, DMR-MARC, etc.).
+Analyze DMR repeater distribution and color codes.
 
 ```python
 import asyncio
 from collections import Counter
 from repeaterbook import RepeaterBook, Repeater
 from repeaterbook.services import RepeaterBookAPI
-from repeaterbook.models import ExportQuery
+from repeaterbook.models import ExportQuery, Status
 import pycountry
 
-async def analyze_networks():
-    """Analyze DMR network distribution."""
+async def analyze_dmr():
+    """Analyze DMR repeater distribution."""
 
     # Download data
     api = RepeaterBookAPI()
@@ -626,20 +626,22 @@ async def analyze_networks():
     rb.populate(repeaters)
 
     # Get DMR repeaters
-    dmr_repeaters = rb.query(Repeater.dmr_capable == True)
-
-    # Count by network
-    networks = Counter(r.network for r in dmr_repeaters if r.network)
+    dmr_repeaters = rb.query(
+        Repeater.dmr_capable == True,
+        Repeater.operational_status == Status.ON_AIR
+    )
 
     print("=" * 80)
-    print("DMR NETWORK DISTRIBUTION")
+    print("DMR REPEATER ANALYSIS")
     print("=" * 80)
-    print(f"\nTotal DMR Repeaters: {len(dmr_repeaters)}")
-    print(f"\nTop 10 Networks:")
+    print(f"\nTotal Operational DMR Repeaters: {len(dmr_repeaters)}")
 
-    for network, count in networks.most_common(10):
+    # Count by state
+    states = Counter(r.state for r in dmr_repeaters if r.state)
+    print(f"\nTop 10 States by DMR Repeaters:")
+    for state, count in states.most_common(10):
         percentage = (count / len(dmr_repeaters)) * 100
-        print(f"  {network:30s} {count:5d} ({percentage:5.1f}%)")
+        print(f"  {state:25s} {count:5d} ({percentage:5.1f}%)")
 
     # Find most popular color codes
     color_codes = Counter(r.dmr_color_code for r in dmr_repeaters if r.dmr_color_code)
@@ -648,10 +650,14 @@ async def analyze_networks():
     for cc, count in sorted(color_codes.items()):
         percentage = (count / len(dmr_repeaters)) * 100
         bar = "█" * int(percentage)
-        print(f"  CC{cc:2d}: {bar} {count:4d} ({percentage:5.1f}%)")
+        print(f"  CC{cc}: {bar} {count:4d} ({percentage:5.1f}%)")
+
+    # Count repeaters with DMR IDs
+    with_dmr_id = sum(1 for r in dmr_repeaters if r.dmr_id)
+    print(f"\nRepeaters with DMR ID: {with_dmr_id} ({with_dmr_id/len(dmr_repeaters)*100:.1f}%)")
 
 if __name__ == '__main__':
-    asyncio.run(analyze_networks())
+    asyncio.run(analyze_dmr())
 ```
 
 ## Next Steps

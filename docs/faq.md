@@ -289,8 +289,10 @@ Repeater data doesn't change frequently. Recommended refresh intervals:
 - **Static analysis**: Download once, use indefinitely
 
 ```python
+from datetime import timedelta
+
 # Set longer cache for production
-api = RepeaterBookAPI(cache_ttl=86400)  # 24 hours
+api = RepeaterBookAPI(max_cache_age=timedelta(hours=24))
 ```
 
 ### Can I download all repeaters worldwide?

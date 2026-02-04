@@ -364,7 +364,6 @@ for rep in dmr_repeaters:
     print(f"{rep.callsign}:")
     print(f"  DMR ID: {rep.dmr_id}")
     print(f"  Color Code: {rep.dmr_color_code}")
-    print(f"  Network: {rep.network}")
 ```
 
 ### P25 Specific Data
@@ -609,9 +608,6 @@ rep.p_25_nac        # P25 NAC code
 rep.latitude        # Latitude (degrees)
 rep.longitude       # Longitude (degrees)
 rep.precise         # Precise location flag
-
-# Network
-rep.network         # Network name (Brandmeister, DMR-MARC, etc.)
 
 # Notes
 rep.notes           # Additional information
