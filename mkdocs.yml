@@ -6,9 +6,9 @@ repo_name: "MicaelJarniac/repeaterbook"
 copyright: "Copyright &copy; 2025, Micael Jarniac"
 
 # Documentation source directory (relative to this config file)
-docs_dir: "."
+docs_dir: "docs"
 # Build output directory (outside docs dir to avoid conflicts)
-site_dir: "../site"
+site_dir: "site"
 
 theme:
   name: material

@@ -94,11 +94,11 @@ def test_code(session: nox.Session) -> None:
 def docs(session: nox.Session) -> None:
     """Build documentation with MkDocs."""
     install(session, groups=["docs"], root=True)
-    session.run("mkdocs", "build", "-f", "docs/mkdocs.yml")
+    session.run("mkdocs", "build", "-f", "mkdocs.yml")
 
 
 @nox.session(python=python_version, default=False)
 def docs_serve(session: nox.Session) -> None:
     """Serve documentation locally with live reload."""
     install(session, groups=["docs"], root=True)
-    session.run("mkdocs", "serve", "-f", "docs/mkdocs.yml")
+    session.run("mkdocs", "serve", "-f", "mkdocs.yml")

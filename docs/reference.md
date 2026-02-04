@@ -48,7 +48,7 @@
     - [`pyproject.toml`][pyproject_toml]
     - [`.pre-commit-config.yaml`][_pre-commit-config_yaml]
     - [`.editorconfig`][_editorconfig]
-    - [`docs/mkdocs.yml`][docs_mkdocs_yml]
+    - [`mkdocs.yml`][docs_mkdocs_yml]
     - [`docs/wordlist.txt`][docs_wordlist_txt]
     - [`noxfile.py`][noxfile_py]
 - Standards
@@ -76,7 +76,7 @@
 [_pre-commit-config_yaml]: ../.pre-commit-config.yaml
 [pyproject_toml]: ../pyproject.toml
 [_editorconfig]: ../.editorconfig
-[docs_mkdocs_yml]: ./mkdocs.yml
+[docs_mkdocs_yml]: ../mkdocs.yml
 [docs_wordlist_txt]: ./wordlist.txt
 [noxfile_py]: ../noxfile.py
 
