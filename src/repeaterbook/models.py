@@ -34,6 +34,7 @@ from typing import Literal, TypeAlias, TypedDict
 
 import attrs
 from pycountry.db import Country  # noqa: TC002
+from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
 
@@ -103,7 +104,6 @@ class Repeater(SQLModel, table=True):
     races: str | None
     skywarn: str | None
     canwarn: str | None
-    #' operating_mode: str
     allstar_node: str | None
     echolink_node: str | None
     irlp_node: str | None
@@ -128,6 +128,33 @@ class Repeater(SQLModel, table=True):
     fm_bandwidth: Decimal | None
     notes: str | None
     last_update: date
+
+    @field_validator("latitude")
+    @classmethod
+    def validate_latitude(cls, v: Decimal) -> Decimal:
+        """Validate latitude is within valid range."""
+        if not Decimal(-90) <= v <= Decimal(90):
+            msg = f"Latitude must be between -90 and 90, got {v}"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("longitude")
+    @classmethod
+    def validate_longitude(cls, v: Decimal) -> Decimal:
+        """Validate longitude is within valid range."""
+        if not Decimal(-180) <= v <= Decimal(180):
+            msg = f"Longitude must be between -180 and 180, got {v}"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("frequency", "input_frequency")
+    @classmethod
+    def validate_frequency(cls, v: Decimal) -> Decimal:
+        """Validate frequency is positive."""
+        if v <= 0:
+            msg = f"Frequency must be positive, got {v}"
+            raise ValueError(msg)
+        return v
 
 
 ZeroOneJSON: TypeAlias = Literal[
