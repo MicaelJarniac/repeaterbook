@@ -113,7 +113,7 @@ async def find_nearby_repeaters():
     rb.populate(repeaters)
 
     # Find DMR repeaters within 50km of São Paulo
-    sao_paulo = LatLon(latitude=-23.5505, longitude=-46.6333)
+    sao_paulo = LatLon(lat=-23.5505, lon=-46.6333)
     radius = Radius(origin=sao_paulo, distance=50)
 
     nearby = rb.query(
@@ -125,9 +125,11 @@ async def find_nearby_repeaters():
 
     filtered = filter_radius(nearby, radius)
 
-    # Display results
-    for rep in sorted(filtered, key=lambda r: r.distance)[:5]:
-        print(f"{rep.distance:.1f}km - {rep.frequency:.4f} MHz - {rep.callsign}")
+    # Display results (filter_radius returns repeaters sorted by distance)
+    from haversine import haversine
+    for rep in filtered[:5]:
+        distance = haversine(radius.origin, (rep.latitude, rep.longitude), unit=radius.unit)
+        print(f"{distance:.1f}km - {rep.frequency:.4f} MHz - {rep.callsign}")
 
 asyncio.run(find_nearby_repeaters())
 ```
