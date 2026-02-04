@@ -1,6 +1,6 @@
 [project]
 name = "repeaterbook"
-version = "0.3.0"
+version = "0.4.0"
 description = "Python utility to work with data from RepeaterBook."
 authors = [
   {name = "Micael Jarniac", email = "micael@jarniac.dev"},

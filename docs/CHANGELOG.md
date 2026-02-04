@@ -1,6 +1,57 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-02-04)
+
+### Features
+
+- Comprehensive codebase improvements ([#8](https://github.com/MicaelJarniac/repeaterbook/pull/8),
+  [`c893c4b`](https://github.com/MicaelJarniac/repeaterbook/commit/c893c4b39125d4f843d11cb06f633122b809b769))
+
+* feat: comprehensive codebase improvements
+
+- Add custom exception classes (RepeaterBookError, RepeaterBookAPIError, RepeaterBookCacheError,
+  RepeaterBookValidationError) - Enable North America endpoint in urls_export() - Fix cache race
+  conditions with atomic write pattern - Add model validation for latitude, longitude, and frequency
+  fields - Replace MD5 with SHA256 for cache key generation - Make configuration injectable
+  (max_cache_age, max_count) - Remove commented-out operating_mode field - Improve type safety with
+  explanatory comments for casts - Optimize cache stat calls (single stat instead of exists + stat)
+
+Test suite expansion: - Add test_exceptions.py for exception hierarchy - Add test_services.py for
+  services module - Add test_models.py for model validation - Add test_queries.py for query builders
+  - Add test_database.py for database operations - Add test_utils.py for utility functions - Expand
+  test_repeaterbook.py for public API
+
+Total: 108 tests passing
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+* feat: add smart routing for NA/ROW endpoints
+
+Implement intelligent endpoint routing in urls_export(): - NA-specific fields (state_id, county,
+  emcomm, stype) route to NA only - ROW-specific fields (region) route to ROW only - NA countries
+  (US, Canada, Mexico) route to NA only - ROW countries route to ROW only - Mixed or common-only
+  queries route to both
+
+This prevents redundant API calls and avoids unfiltered queries that could return thousands of
+  irrelevant results.
+
+Added tests for all routing scenarios.
+
+* test: add comprehensive smart routing integration tests
+
+Add live API integration tests to verify smart routing behavior: - NA-only queries (state_id) route
+  to export.php only - ROW-only queries (region) route to exportROW.php only - NA country queries
+  route to NA endpoint - ROW country queries route to ROW endpoint - Mixed country queries route to
+  both endpoints - Empty queries route to both endpoints - Mode-only queries route to both endpoints
+
+Also fix linting warnings (use next(iter()) instead of list()[0]).
+
+---------
+
+Co-authored-by: Claude Opus 4.5 <noreply@anthropic.com>
+
+
 ## v0.3.0 (2026-02-03)
 
 ### Chores
