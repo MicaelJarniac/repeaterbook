@@ -268,11 +268,26 @@ class RepeaterBookAPI:
         """Rest of world (not north-america) export URL."""
         return self.url_api / "exportROW.php"
 
+    # North America countries served by export.php endpoint
+    NA_COUNTRIES: frozenset[str] = frozenset({
+        "United States",
+        "Canada",
+        "Mexico",
+    })
+
     def urls_export(
         self,
         query: ExportQuery,
     ) -> set[URL]:
-        """Generate export URLs for given query."""
+        """Generate export URLs for given query.
+
+        Smart routing logic:
+        - If NA-specific fields are used (state_id, county, emcomm, stype),
+          only query the NA endpoint
+        - If ROW-specific fields are used (region), only query the ROW endpoint
+        - If countries are specified, route based on whether they're NA or ROW
+        - If no routing hints, query both endpoints
+        """
         mode_map: dict[Mode, ModeJSON] = {
             Mode.ANALOG: "analog",
             Mode.DMR: "DMR",
@@ -289,6 +304,33 @@ class RepeaterBookAPI:
         type_map: dict[ServiceType, ServiceTypeJSON] = {
             ServiceType.GMRS: "GMRS",
         }
+
+        # Determine which endpoints to query based on the query parameters
+        has_na_specific = bool(
+            query.state_ids or query.counties or
+            query.emergency_services or query.service_types
+        )
+        has_row_specific = bool(query.regions)
+
+        # Check if countries are specified and categorize them
+        query_countries = {country.name for country in query.countries}
+        has_na_countries = bool(query_countries & self.NA_COUNTRIES)
+        has_row_countries = bool(query_countries - self.NA_COUNTRIES)
+
+        # Determine which endpoints to query
+        query_na_endpoint = True
+        query_row_endpoint = True
+
+        if has_na_specific and not has_row_specific:
+            # NA-specific fields used, only query NA
+            query_row_endpoint = False
+        elif has_row_specific and not has_na_specific:
+            # ROW-specific fields used, only query ROW
+            query_na_endpoint = False
+        elif query_countries:
+            # Countries specified - route based on country location
+            query_na_endpoint = has_na_countries
+            query_row_endpoint = has_row_countries
 
         query_na = ExportNorthAmericaQuery(
             callsign=list(query.callsigns),
@@ -325,10 +367,14 @@ class RepeaterBookAPI:
 
         # Safe casts: URL % operator expects dict[str, str], and TypedDict values
         # are all list[str] which serialize correctly for query parameters.
-        return {
-            self.url_export_north_america % cast("dict[str, str]", query_na),
-            self.url_export_rest_of_world % cast("dict[str, str]", query_world),
-        }
+        urls: set[URL] = set()
+        if query_na_endpoint:
+            na_params = cast("dict[str, str]", query_na)
+            urls.add(self.url_export_north_america % na_params)
+        if query_row_endpoint:
+            row_params = cast("dict[str, str]", query_world)
+            urls.add(self.url_export_rest_of_world % row_params)
+        return urls
 
     async def export_json(self, url: URL) -> ExportJSON:
         """Export data for given URL."""

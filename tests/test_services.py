@@ -263,23 +263,68 @@ class TestRepeaterBookAPIUrls:
         assert any("export.php" in url for url in url_strs)  # NA
         assert any("exportROW.php" in url for url in url_strs)  # ROW
 
-    def test_urls_export_with_country(self) -> None:
-        """Query with country should include country in URL."""
+    def test_urls_export_na_country_routes_to_na_only(self) -> None:
+        """Query with NA country (US) should only query NA endpoint."""
+        api = RepeaterBookAPI()
+        us = pycountry.countries.lookup("United States")
+        query = ExportQuery(countries=frozenset({us}))
+        urls = api.urls_export(query)
+        assert len(urls) == 1
+        url_str = str(list(urls)[0])
+        assert "export.php" in url_str
+        assert "exportROW" not in url_str
+        assert "United+States" in url_str
+
+    def test_urls_export_row_country_routes_to_row_only(self) -> None:
+        """Query with ROW country (Brazil) should only query ROW endpoint."""
         api = RepeaterBookAPI()
         brazil = pycountry.countries.lookup("Brazil")
         query = ExportQuery(countries=frozenset({brazil}))
         urls = api.urls_export(query)
-        # Check that at least one URL contains the country
-        url_strs = [str(url) for url in urls]
-        assert any("Brazil" in url for url in url_strs)
+        assert len(urls) == 1
+        url_str = str(list(urls)[0])
+        assert "exportROW.php" in url_str
+        assert "Brazil" in url_str
+
+    def test_urls_export_mixed_countries_routes_to_both(self) -> None:
+        """Query with both NA and ROW countries should query both endpoints."""
+        api = RepeaterBookAPI()
+        us = pycountry.countries.lookup("United States")
+        brazil = pycountry.countries.lookup("Brazil")
+        query = ExportQuery(countries=frozenset({us, brazil}))
+        urls = api.urls_export(query)
+        assert len(urls) == 2
+
+    def test_urls_export_state_id_routes_to_na_only(self) -> None:
+        """Query with state_id (NA-specific) should only query NA endpoint."""
+        api = RepeaterBookAPI()
+        query = ExportQuery(state_ids=frozenset({"06"}))
+        urls = api.urls_export(query)
+        assert len(urls) == 1
+        url_str = str(list(urls)[0])
+        assert "export.php" in url_str
+        assert "exportROW" not in url_str
+        assert "state_id=06" in url_str
+
+    def test_urls_export_region_routes_to_row_only(self) -> None:
+        """Query with region (ROW-specific) should only query ROW endpoint."""
+        api = RepeaterBookAPI()
+        query = ExportQuery(regions=frozenset({"South America"}))
+        urls = api.urls_export(query)
+        assert len(urls) == 1
+        url_str = str(list(urls)[0])
+        assert "exportROW.php" in url_str
+        assert "South+America" in url_str
 
     def test_urls_export_with_mode(self) -> None:
-        """Query with mode should include mode in URL."""
+        """Query with mode only should query both endpoints."""
         api = RepeaterBookAPI()
         query = ExportQuery(modes=frozenset({Mode.DMR}))
         urls = api.urls_export(query)
+        # Mode is a common field, so both endpoints are queried
+        assert len(urls) == 2
         url_strs = [str(url) for url in urls]
-        assert any("DMR" in url for url in url_strs)
+        assert all("DMR" in url for url in url_strs)
 
     def test_custom_base_url(self) -> None:
         """Custom base_url should be used."""
