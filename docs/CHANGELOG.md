@@ -1,6 +1,109 @@
 # CHANGELOG
 
 
+## v0.4.1 (2026-03-04)
+
+### Bug Fixes
+
+- Handle API errors
+  ([`e676c5b`](https://github.com/MicaelJarniac/repeaterbook/commit/e676c5bb1cf0ae232d62a2d34cd8d85abc644aeb))
+
+### Documentation
+
+- Add comprehensive documentation ([#12](https://github.com/MicaelJarniac/repeaterbook/pull/12),
+  [`457a003`](https://github.com/MicaelJarniac/repeaterbook/commit/457a00322ed0816a39219817b8fa4c8b38dda8f8))
+
+* docs: add comprehensive documentation
+
+Add extensive documentation covering all aspects of the RepeaterBook library:
+
+- getting-started.md: Complete tutorial for beginners with quick start examples - usage.md:
+  Comprehensive usage guide covering API client, database operations, geographic queries, frequency
+  filtering, digital modes, and data export - architecture.md: Technical architecture documentation
+  with diagrams, data flow explanations, design decisions, and extensibility guide - examples.md:
+  Real-world examples including web apps, codeplug generation, coverage maps, statistics dashboards,
+  travel planning, and network analysis - faq.md: Extensive FAQ covering installation, usage,
+  performance, troubleshooting, and integration questions - README.md: Enhanced with better
+  introduction, features list, quick example, and clear navigation to all documentation sections -
+  mkdocs.yml: Updated navigation structure to include all new documentation pages
+
+This significantly improves the developer experience by providing clear, comprehensive documentation
+  with practical examples for common use cases.
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+* fix: regenerate corrupted uv.lock file
+
+The uv.lock file had a corruption with typing-extensions dependency missing source field.
+  Regenerated the lock file to resolve the issue.
+
+* fix: correct all field names and API usage in documentation examples
+
+Fixed all code examples across documentation to use correct field names and proper API patterns:
+
+- Changed LatLon(latitude=, longitude=) to LatLon(lat=, lon=) - Updated field names to match actual
+  model: - location → location_nearest_city - input_ctcss → pl_ctcss_uplink - output_ctcss →
+  pl_ctcss_tsq_downlink - p25_capable → apco_p_25_capable - p25_nac → p_25_nac - Fixed distance
+  handling: filter_radius() returns sorted repeaters but doesn't add distance attribute, must
+  calculate manually with haversine - Changed states= to state_ids= in ExportQuery - Removed
+  references to non-existent fields (input_dcs, output_dcs, nxdn_ran, trustee) - Fixed emergency
+  services to use actual fields (ares, races, skywarn, canwarn) instead of non-existent
+  Emergency.YES/NO enum - Removed incorrect rb.session usage
+
+All examples now work correctly with the actual codebase.
+
+* fix: infinite CI
+
+* chore: update cruft
+
+* build(CI): fix pre-commit
+
+* chore: cruft update
+
+* docs: update documentation for v0.4.0 features
+
+- Updated API configuration to use max_cache_age (timedelta) instead of cache_ttl - Added
+  documentation for custom exceptions: - RepeaterBookError (base) - RepeaterBookAPIError -
+  RepeaterBookValidationError - RepeaterBookCacheError - Documented model validation (latitude,
+  longitude, frequency) - Added error handling examples to usage guide and FAQ - Added timedelta,
+  haversine, frozenset to wordlist
+
+- Changed LatLon(latitude=, longitude=) to LatLon(lat=, lon=) - Removed non-existent .distance
+  attribute access - Added inline haversine calculation for distance display - filter_radius()
+  returns sorted repeaters without distance attribute
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+* fix: remove non-existent field references and update API patterns
+
+- Remove rep.network references (field doesn't exist in Repeater model) - Update cache_ttl to
+  max_cache_age (timedelta) in examples - Fix filter_radius documentation to not set
+  repeater.distance - Fix square_bounds call signature - Rename Example 7 from network analysis to
+  DMR analysis
+
+* fix: use FIPS codes for state_ids instead of state names
+
+The state_ids parameter requires numeric FIPS codes (e.g., "06" for California, "48" for Texas), not
+  state names. Updated all documentation examples to use correct FIPS codes.
+
+Examples: - California: "06" - Nevada: "32" - Oregon: "41" - Washington: "53" - Texas: "48" -
+  Oklahoma: "40" - New Mexico: "35" - Florida: "12" - Arizona: "04" - Utah: "49"
+
+* fix: use keyword argument for RepeaterBook database parameter
+
+RepeaterBook's first positional arg is working_dir, not database. Fixed all examples to use
+  database= keyword argument.
+
+Also removed incorrect :memory: example - the current implementation doesn't support in-memory
+  databases as it always constructs a file path.
+
+* chore: mkdocs cfg place
+
+---------
+
+Co-authored-by: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+
 ## v0.4.0 (2026-02-04)
 
 ### Features
