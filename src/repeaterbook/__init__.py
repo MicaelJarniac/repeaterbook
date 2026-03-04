@@ -8,14 +8,21 @@ __all__: tuple[str, ...] = (
     "RepeaterBookAPIError",
     "RepeaterBookCacheError",
     "RepeaterBookError",
+    "RepeaterBookUnauthorizedError",
     "RepeaterBookValidationError",
+    "__version__",
 )
+
+from importlib.metadata import version
 
 from repeaterbook.database import RepeaterBook
 from repeaterbook.exceptions import (
     RepeaterBookAPIError,
     RepeaterBookCacheError,
     RepeaterBookError,
+    RepeaterBookUnauthorizedError,
     RepeaterBookValidationError,
 )
 from repeaterbook.models import Repeater
+
+__version__ = version("repeaterbook")

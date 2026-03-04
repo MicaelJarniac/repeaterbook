@@ -45,7 +45,7 @@ async def test_live_export_row_brazil_downloads_and_parses(
     """Brazil repeaters download and parse correctly from ROW endpoint."""
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
-        app_email="micael@jarniac.dev",
+        app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 
@@ -68,7 +68,7 @@ async def test_live_export_north_america_payload_parses_first_rows(
     """
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
-        app_email="micael@jarniac.dev",
+        app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 
@@ -96,7 +96,7 @@ async def test_smart_routing_na_only_via_state_id(tmp_path: StdPath) -> None:
     """Query with state_id routes only to NA endpoint."""
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
-        app_email="micael@jarniac.dev",
+        app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 
@@ -123,7 +123,7 @@ async def test_smart_routing_row_only_via_region(tmp_path: StdPath) -> None:
     """Query with region routes only to ROW endpoint."""
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
-        app_email="micael@jarniac.dev",
+        app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 
@@ -148,7 +148,7 @@ async def test_smart_routing_na_country_only(tmp_path: StdPath) -> None:
     """Query with NA country routes only to NA endpoint."""
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
-        app_email="micael@jarniac.dev",
+        app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 
@@ -171,7 +171,7 @@ async def test_smart_routing_row_country_only(tmp_path: StdPath) -> None:
     """Query with ROW country routes only to ROW endpoint."""
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
-        app_email="micael@jarniac.dev",
+        app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 
@@ -194,7 +194,7 @@ async def test_smart_routing_mixed_countries_both_endpoints(tmp_path: StdPath) -
     """Query with both NA and ROW countries routes to both endpoints."""
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
-        app_email="micael@jarniac.dev",
+        app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 
@@ -216,7 +216,7 @@ async def test_smart_routing_empty_query_both_endpoints(tmp_path: StdPath) -> No
     """Empty query routes to both endpoints."""
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
-        app_email="micael@jarniac.dev",
+        app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 
@@ -236,7 +236,7 @@ async def test_smart_routing_mode_filter_both_endpoints(tmp_path: StdPath) -> No
     """Query with only mode (common filter) routes to both endpoints."""
     api = RepeaterBookAPI(
         app_name="repeaterbook-live-test",
-        app_email="micael@jarniac.dev",
+        app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 

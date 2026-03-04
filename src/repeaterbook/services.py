@@ -15,17 +15,21 @@ import asyncio
 import hashlib
 import json
 import time
+from contextlib import suppress
 from datetime import date, timedelta
+from decimal import Decimal
 from http import HTTPStatus
-from typing import Any, Final, cast
+from typing import Any, Final, TypedDict, cast
 
 import aiohttp
 import attrs
 from anyio import Path
 from loguru import logger
 from tqdm import tqdm
+from typing_extensions import NotRequired
 from yarl import URL
 
+from repeaterbook import __version__
 from repeaterbook.exceptions import (
     RepeaterBookAPIError,
     RepeaterBookUnauthorizedError,
@@ -59,10 +63,19 @@ class APIError(Exception):
         super().__init__(self.message)
 
 
+IdentityHeaders = TypedDict(
+    "IdentityHeaders",
+    {
+        "User-Agent": str,
+        "Authorization": NotRequired[str],
+    },
+)
+
+
 async def fetch_json(
     url: URL,
     *,
-    headers: dict[str, str] | None = None,
+    headers: IdentityHeaders | None = None,
     cache_dir: Path | None = None,
     max_cache_age: timedelta = timedelta(seconds=3600),
     chunk_size: int = 1024,
@@ -82,19 +95,20 @@ async def fetch_json(
     temp_file = cache_dir / f"api_cache_{hashed_url}.tmp"
 
     # Check if fresh cached data exists using a single stat call.
-    try:
+    with suppress(FileNotFoundError, json.JSONDecodeError):
         stat = await cache_file.stat()
         file_age = time.time() - stat.st_mtime
         if file_age < max_cache_age.total_seconds():
             logger.info("Using cached data.")
             return json.loads(await cache_file.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass  # Cache doesn't exist or invalid, continue to fetch
 
+    # Cache doesn't exist or is invalid, continue to fetch
     logger.info("Fetching new data from API...")
     async with (
-        aiohttp.ClientSession() as session,
-        session.get(url, headers=headers) as response,
+        aiohttp.ClientSession(
+            headers=cast("dict[str, str] | None", headers)
+        ) as session,
+        session.get(url) as response,
     ):
         try:
             response.raise_for_status()
@@ -120,7 +134,7 @@ async def fetch_json(
     return json.loads(await cache_file.read_text(encoding="utf-8"))
 
 
-BOOL_MAP: Final = {
+BOOL_MAP: Final[dict[str | int, bool]] = {
     "Yes": True,
     "No": False,
     1: True,
@@ -128,14 +142,14 @@ BOOL_MAP: Final = {
 }
 
 
-USE_MAP: Final = {
+USE_MAP: Final[dict[str, Use]] = {
     "OPEN": Use.OPEN,
     "PRIVATE": Use.PRIVATE,
     "CLOSED": Use.CLOSED,
     "": Use.OPEN,  # Some export payloads include empty Use; treat as OPEN.
 }
 
-STATUS_MAP: Final = {
+STATUS_MAP: Final[dict[str, Status]] = {
     "Off-air": Status.OFF_AIR,
     "On-air": Status.ON_AIR,
     "Unknown": Status.UNKNOWN,
@@ -163,10 +177,17 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
     """
 
     def s(key: str) -> str:
+        """Safely parse RepeaterBook string fields."""
         v = j.get(key, "")
+        return "" if v is None else str(v)
+
+    def d(key: str) -> Decimal:
+        """Safely parse RepeaterBook decimal fields."""
+        v = j.get(key)
         if v is None:
-            return ""
-        return str(v)
+            msg = f"Missing required decimal field: {key}"
+            raise ValueError(msg)
+        return Decimal(str(v))
 
     def b(key: str, *, default: bool = False) -> bool:
         """Parse RepeaterBook boolean-ish fields.
@@ -174,14 +195,22 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
         RepeaterBook uses a mix of "Yes"/"No" strings and 1/0 ints.
         Missing/unknown values fall back to `default`.
         """
-        return BOOL_MAP.get(j.get(key), default)
+        v = j.get(key)
+        if not (isinstance(v, (str, int)) or v is None):
+            msg = f"Invalid type for boolean field {key}: {type(v)}"
+            raise TypeError(msg)
+        return default if v is None else BOOL_MAP.get(v, default)
+
+    def parse_fm_bandwidth(value: str) -> Decimal | None:
+        """Parse FM Bandwidth field, which may include " kHz" suffix."""
+        return Decimal(value.replace(" kHz", "")) if value else None
 
     return Repeater.model_validate(
         Repeater(
             state_id=s("State ID"),
             repeater_id=int(j.get("Rptr ID", 0) or 0),
-            frequency=s("Frequency"),
-            input_frequency=s("Input Freq"),
+            frequency=d("Frequency"),
+            input_frequency=d("Input Freq"),
             pl_ctcss_uplink=s("PL") or None,
             pl_ctcss_tsq_downlink=s("TSQ") or None,
             location_nearest_city=s("Nearest City"),
@@ -190,8 +219,8 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             country=s("Country") or None,
             county=s("County") or None,
             state=s("State") or None,
-            latitude=s("Lat"),
-            longitude=s("Long"),
+            latitude=d("Lat"),
+            longitude=d("Long"),
             precise=BOOL_MAP[j.get("Precise", 0)],
             callsign=s("Callsign") or None,
             use_membership=USE_MAP.get(s("Use"), Use.OPEN),
@@ -209,7 +238,7 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             irlp_node=s("IRLP Node") or None,
             wires_node=s("Wires Node") or None,
             analog_capable=b("FM Analog", default=False),
-            fm_bandwidth=s("FM Bandwidth").replace(" kHz", "") or None,
+            fm_bandwidth=parse_fm_bandwidth(s("FM Bandwidth")),
             dmr_capable=b("DMR", default=False),
             dmr_color_code=s("DMR Color Code") or None,
             dmr_id=s("DMR ID") or None,
@@ -223,6 +252,9 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             tetra_mcc=s("Tetra MCC") or None,
             tetra_mnc=s("Tetra MNC") or None,
             yaesu_system_fusion_capable=b("System Fusion", default=False),
+            ysf_digital_id_downlink=None,
+            ysf_digital_id_uplink=None,
+            ysf_dsc=None,
             notes=s("Notes") or None,
             last_update=parse_date(s("Last Update")),
         )
@@ -238,7 +270,9 @@ class RepeaterBookAPI:
     Attributes:
         base_url: The RepeaterBook API base URL.
         app_name: Application name for User-Agent header.
-        app_email: Contact email for User-Agent header.
+        app_version: Application version for User-Agent header.
+        app_contact: Contact information for User-Agent header.
+        app_token: Optional API token for Authorization header.
         working_dir: Directory for cache and database files.
         max_cache_age: Maximum age of cached API responses before refresh.
             Defaults to 1 hour.
@@ -248,7 +282,9 @@ class RepeaterBookAPI:
 
     base_url: URL = attrs.Factory(lambda: URL("https://repeaterbook.com"))
     app_name: str = "RepeaterBook Python SDK"
-    app_email: str = "micael@jarniac.dev"
+    app_version: str = __version__
+    app_contact: str = "micael@jarniac.dev"
+    app_token: str | None = None
 
     working_dir: Path = attrs.Factory(Path)
 
@@ -266,6 +302,16 @@ class RepeaterBookAPI:
                 logger.info("Creating .gitignore file.")
                 await gitignore.write_text("*\n", encoding="utf-8")
         return cache
+
+    @property
+    def headers(self) -> IdentityHeaders:
+        """HTTP headers for API requests."""
+        headers: IdentityHeaders = {
+            "User-Agent": f"{self.app_name}/{self.app_version} (+{self.app_contact})",
+        }
+        if self.app_token:
+            headers["Authorization"] = f"Bearer {self.app_token}"
+        return headers
 
     @property
     def url_api(self) -> URL:
@@ -397,9 +443,9 @@ class RepeaterBookAPI:
     async def export_json(self, url: URL) -> ExportJSON:
         """Export data for given URL."""
         try:
-            data: ExportJSON | ExportErrorJSON = await fetch_json(
+            data: ExportJSON | ExportErrorJSON | Any = await fetch_json(
                 url,
-                headers={"User-Agent": f"{self.app_name} <{self.app_email}>"},
+                headers=self.headers,
                 cache_dir=await self.cache_dir(),
                 max_cache_age=self.max_cache_age,
             )
@@ -412,6 +458,8 @@ class RepeaterBookAPI:
         if not isinstance(data, dict):
             msg = f"Expected dict response from API, got {type(data).__name__}"
             raise RepeaterBookValidationError(msg)
+
+        data = cast("ExportErrorJSON | ExportJSON", data)
 
         if data.get("status") == "error":
             raise RepeaterBookAPIError(data.get("message", "Unknown API error"))
