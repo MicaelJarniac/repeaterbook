@@ -337,7 +337,9 @@ class TestRepeaterBookAPIExport:
 
     @pytest.mark.anyio
     async def test_export_json_raises_on_non_dict_response(
-        self, tmp_path: StdPath, local_server: Any  # noqa: ANN401
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
     ) -> None:
         """export_json should raise RepeaterBookValidationError on non-dict response."""
 
@@ -351,7 +353,9 @@ class TestRepeaterBookAPIExport:
 
     @pytest.mark.anyio
     async def test_export_json_raises_on_api_error(
-        self, tmp_path: StdPath, local_server: Any  # noqa: ANN401
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
     ) -> None:
         """export_json should raise RepeaterBookAPIError on API error response."""
 
@@ -365,7 +369,9 @@ class TestRepeaterBookAPIExport:
 
     @pytest.mark.anyio
     async def test_export_json_raises_on_missing_count(
-        self, tmp_path: StdPath, local_server: Any  # noqa: ANN401
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
     ) -> None:
         """export_json should raise RepeaterBookValidationError on missing count."""
 
@@ -379,7 +385,9 @@ class TestRepeaterBookAPIExport:
 
     @pytest.mark.anyio
     async def test_export_json_raises_on_missing_results(
-        self, tmp_path: StdPath, local_server: Any  # noqa: ANN401
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
     ) -> None:
         """export_json should raise RepeaterBookValidationError on missing results."""
 
@@ -393,7 +401,9 @@ class TestRepeaterBookAPIExport:
 
     @pytest.mark.anyio
     async def test_export_json_success(
-        self, tmp_path: StdPath, local_server: Any  # noqa: ANN401
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
     ) -> None:
         """export_json should return data on valid response."""
 

@@ -135,9 +135,7 @@ class TestFilterRadius:
         assert result[1].repeater_id == 3  # San Diego
         assert result[2].repeater_id == 2  # SF (furthest)
 
-    def test_filter_radius_empty_result(
-        self, sample_repeaters: list[Repeater]
-    ) -> None:
+    def test_filter_radius_empty_result(self, sample_repeaters: list[Repeater]) -> None:
         """filter_radius should return empty list if no repeaters in range."""
         # Point in the Atlantic Ocean
         atlantic = LatLon(lat=30.0, lon=-40.0)
@@ -172,7 +170,15 @@ class TestBandsEnum:
     def test_all_bands_defined(self) -> None:
         """All expected bands should be defined."""
         expected_bands = [
-            "M_10", "M_6", "M_4", "M_2", "CM_70", "CM_33", "CM_23", "CM_13", "CM_3"
+            "M_10",
+            "M_6",
+            "M_4",
+            "M_2",
+            "CM_70",
+            "CM_33",
+            "CM_23",
+            "CM_13",
+            "CM_3",
         ]
         for band_name in expected_bands:
             assert hasattr(Bands, band_name)
