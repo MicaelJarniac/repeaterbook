@@ -6,6 +6,7 @@ __all__: tuple[str, ...] = (
     "RepeaterBookAPIError",
     "RepeaterBookCacheError",
     "RepeaterBookError",
+    "RepeaterBookUnauthorizedError",
     "RepeaterBookValidationError",
 )
 
@@ -23,6 +24,14 @@ class RepeaterBookAPIError(RepeaterBookError):
 
     Raised when the API returns an error response (status: "error").
     The error message from the API is preserved in the exception message.
+    """
+
+
+class RepeaterBookUnauthorizedError(RepeaterBookAPIError):
+    """Unauthorized access to the API.
+
+    Raised when the API returns a 401 Unauthorized status code,
+    indicating that authentication is required or has failed.
     """
 
 

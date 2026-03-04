@@ -16,6 +16,7 @@ import hashlib
 import json
 import time
 from datetime import date, timedelta
+from http import HTTPStatus
 from typing import Any, Final, cast
 
 import aiohttp
@@ -27,6 +28,7 @@ from yarl import URL
 
 from repeaterbook.exceptions import (
     RepeaterBookAPIError,
+    RepeaterBookUnauthorizedError,
     RepeaterBookValidationError,
 )
 from repeaterbook.models import (
@@ -46,6 +48,15 @@ from repeaterbook.models import (
     Status,
     Use,
 )
+
+
+class APIError(Exception):
+    """Generic API error for non-200 responses."""
+
+    def __init__(self, status: int, message: str | None = None) -> None:
+        self.status = status
+        self.message = message or f"API returned status code {status}"
+        super().__init__(self.message)
 
 
 async def fetch_json(
@@ -77,15 +88,18 @@ async def fetch_json(
         if file_age < max_cache_age.total_seconds():
             logger.info("Using cached data.")
             return json.loads(await cache_file.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        pass  # Cache doesn't exist, continue to fetch
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass  # Cache doesn't exist or invalid, continue to fetch
 
     logger.info("Fetching new data from API...")
     async with (
         aiohttp.ClientSession() as session,
         session.get(url, headers=headers) as response,
     ):
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except aiohttp.ClientResponseError as e:
+            raise APIError(status=response.status, message=str(e)) from e
         # Write to temp file first for atomic cache updates.
         async with await temp_file.open("wb") as f:
             with tqdm(
@@ -269,11 +283,13 @@ class RepeaterBookAPI:
         return self.url_api / "exportROW.php"
 
     # North America countries served by export.php endpoint
-    NA_COUNTRIES: frozenset[str] = frozenset({
-        "United States",
-        "Canada",
-        "Mexico",
-    })
+    NA_COUNTRIES: frozenset[str] = frozenset(
+        {
+            "United States",
+            "Canada",
+            "Mexico",
+        }
+    )
 
     def urls_export(
         self,
@@ -307,8 +323,10 @@ class RepeaterBookAPI:
 
         # Determine which endpoints to query based on the query parameters
         has_na_specific = bool(
-            query.state_ids or query.counties or
-            query.emergency_services or query.service_types
+            query.state_ids
+            or query.counties
+            or query.emergency_services
+            or query.service_types
         )
         has_row_specific = bool(query.regions)
 
@@ -378,12 +396,18 @@ class RepeaterBookAPI:
 
     async def export_json(self, url: URL) -> ExportJSON:
         """Export data for given URL."""
-        data: ExportJSON | ExportErrorJSON = await fetch_json(
-            url,
-            headers={"User-Agent": f"{self.app_name} <{self.app_email}>"},
-            cache_dir=await self.cache_dir(),
-            max_cache_age=self.max_cache_age,
-        )
+        try:
+            data: ExportJSON | ExportErrorJSON = await fetch_json(
+                url,
+                headers={"User-Agent": f"{self.app_name} <{self.app_email}>"},
+                cache_dir=await self.cache_dir(),
+                max_cache_age=self.max_cache_age,
+            )
+        except APIError as e:
+            msg = f"API request failed for {url}"
+            if e.status == HTTPStatus.UNAUTHORIZED:
+                raise RepeaterBookUnauthorizedError(msg) from e
+            raise RepeaterBookAPIError(msg) from e
 
         if not isinstance(data, dict):
             msg = f"Expected dict response from API, got {type(data).__name__}"
