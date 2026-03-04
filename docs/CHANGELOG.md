@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.4.2 (2026-03-04)
+
+### Bug Fixes
+
+- Support auth
+  ([`fbdcf71`](https://github.com/MicaelJarniac/repeaterbook/commit/fbdcf715e6a32ba91d9c4c8db36ba0963acc6f48))
+
+### Chores
+
+- Format
+  ([`9e71ff4`](https://github.com/MicaelJarniac/repeaterbook/commit/9e71ff44e570e491c67760ca0d7208a42d699f85))
+
+
 ## v0.4.1 (2026-03-04)
 
 ### Bug Fixes
