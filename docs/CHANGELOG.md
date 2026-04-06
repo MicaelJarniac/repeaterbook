@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v0.5.0 (2026-04-06)
+
+### Chores
+
+- **deps**: Bump tornado from 6.5.4 to 6.5.5
+  ([`49e0d7b`](https://github.com/MicaelJarniac/repeaterbook/commit/49e0d7b98382ceeeba2be96e4fc77c517440e899))
+
+Bumps [tornado](https://github.com/tornadoweb/tornado) from 6.5.4 to 6.5.5. -
+  [Changelog](https://github.com/tornadoweb/tornado/blob/master/docs/releases.rst) -
+  [Commits](https://github.com/tornadoweb/tornado/compare/v6.5.4...v6.5.5)
+
+--- updated-dependencies: - dependency-name: tornado dependency-version: 6.5.5
+
+dependency-type: indirect ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+### Documentation
+
+- Add AGENTS.md project knowledge base
+  ([`d1a63e4`](https://github.com/MicaelJarniac/repeaterbook/commit/d1a63e41b528c4a52a2b20dd94c4cbfeb3dd9044))
+
+### Features
+
+- Import from CSV export
+  ([`4e569a2`](https://github.com/MicaelJarniac/repeaterbook/commit/4e569a2d2f7b01548bedd0e5fea478255b1d9e2d))
+
+
 ## v0.4.2 (2026-03-04)
 
 ### Bug Fixes
