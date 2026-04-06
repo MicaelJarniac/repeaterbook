@@ -37,6 +37,8 @@ from pycountry.db import Country  # noqa: TC002
 from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
+# Core models
+
 
 class Status(Enum):
     """Status."""
@@ -155,6 +157,9 @@ class Repeater(SQLModel, table=True):
             msg = f"Frequency must be positive, got {v}"
             raise ValueError(msg)
         return v
+
+
+# JSON models
 
 
 ZeroOneJSON: TypeAlias = Literal[
@@ -326,3 +331,50 @@ class ExportQuery:
     emergency_services: frozenset[Emergency] = frozenset()
     service_types: frozenset[ServiceType] = frozenset()
     regions: frozenset[str] = frozenset()
+
+
+# CSV models
+
+
+RepeaterCSV = TypedDict(
+    "RepeaterCSV",
+    {
+        "Callsign": str,
+        "Frequency (MHz)": str,
+        "Input Frequency (MHz)": str,
+        "Offset (MHz)": str,
+        "Tone": str,
+        "City": str,
+        "County": str,
+        "State": str,
+        "Country": str,
+        "Landmark": str,
+        "Latitude": str,
+        "Longitude": str,
+        "ARES": str,
+        "RACES": str,
+        "SKYWARN": str,
+        "CANWARN": str,
+        "AllStar Node": str,
+        "EchoLink Node": str,
+        "IRLP Node": str,
+        "WIRES-X Node": str,
+        "WIRES-X": str,
+        "FM (analog)": str,
+        "ATV": str,
+        "DMR": str,
+        "DMR Color Code": str,
+        "D-STAR Node": str,
+        "D-STAR Service": str,
+        "NXDN": str,
+        "NXDN RAN": str,
+        "P25": str,
+        "P25 NAC": str,
+        "TETRA": str,
+        "System Fusion": str,
+        "M17": str,
+        "Wide Area": str,
+        "PL Tone": str,
+        "TSQ Tone": str,
+    },
+)
