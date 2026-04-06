@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.5.1 (2026-04-06)
+
+### Bug Fixes
+
+- Remove Py 3.10, add 3.14
+  ([`51b5cb9`](https://github.com/MicaelJarniac/repeaterbook/commit/51b5cb93f0e02c12821bdec61c3a74b46acd4b4f))
+
+
 ## v0.5.0 (2026-04-06)
 
 ### Chores
