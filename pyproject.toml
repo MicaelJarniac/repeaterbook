@@ -18,7 +18,7 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 
-requires-python = ">=3.10"  # py_ver
+requires-python = ">=3.11"  # py_ver
 dependencies = [
     "aiohttp>=3.11.14",
     "anyio>=4.9.0",

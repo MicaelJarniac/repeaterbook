@@ -19,14 +19,13 @@ from contextlib import suppress
 from datetime import date, timedelta
 from decimal import Decimal
 from http import HTTPStatus
-from typing import Any, Final, TypedDict, cast
+from typing import Any, Final, NotRequired, TypedDict, cast
 
 import aiohttp
 import attrs
 from anyio import Path
 from loguru import logger
 from tqdm import tqdm
-from typing_extensions import NotRequired
 from yarl import URL
 
 from repeaterbook import __version__
