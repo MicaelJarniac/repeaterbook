@@ -1,6 +1,39 @@
 # CHANGELOG
 
 
+## v0.6.0 (2026-04-07)
+
+### Chores
+
+- **deps**: Bump aiohttp from 3.13.3 to 3.13.4
+  ([`24b513c`](https://github.com/MicaelJarniac/repeaterbook/commit/24b513c2b7893b43a18ec374758abc7e03fa5e23))
+
+--- updated-dependencies: - dependency-name: aiohttp dependency-version: 3.13.4
+
+dependency-type: direct:production ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+- **deps**: Bump requests from 2.32.5 to 2.33.0
+  ([`0e47556`](https://github.com/MicaelJarniac/repeaterbook/commit/0e47556f129ae47c5398f8bcefb0bee8a2bcdbdb))
+
+Bumps [requests](https://github.com/psf/requests) from 2.32.5 to 2.33.0. - [Release
+  notes](https://github.com/psf/requests/releases) -
+  [Changelog](https://github.com/psf/requests/blob/main/HISTORY.md) -
+  [Commits](https://github.com/psf/requests/compare/v2.32.5...v2.33.0)
+
+--- updated-dependencies: - dependency-name: requests dependency-version: 2.33.0
+
+dependency-type: indirect ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+### Features
+
+- Truncate
+  ([`f1d70f6`](https://github.com/MicaelJarniac/repeaterbook/commit/f1d70f6356e0d7f37d5480a494905480f1ce8400))
+
+
 ## v0.5.1 (2026-04-06)
 
 ### Bug Fixes
