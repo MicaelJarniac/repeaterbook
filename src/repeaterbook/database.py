@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import attrs
 from anyio import Path
 from loguru import logger
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, SQLModel, create_engine, delete, select
 
 from repeaterbook.models import (
     Repeater,
@@ -72,3 +72,11 @@ class RepeaterBook:
         logger.info(f"Found {len(repeaters)} repeaters.")
 
         return repeaters
+
+    def truncate(self) -> None:
+        """Truncate the database."""
+        with Session(self.engine) as session:
+            session.exec(delete(Repeater))
+            session.commit()
+
+        logger.info("Truncated repeaters.")
