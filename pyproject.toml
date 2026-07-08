@@ -43,6 +43,14 @@ changelog = "https://github.com/MicaelJarniac/repeaterbook/blob/main/docs/CHANGE
 documentation = "https://repeaterbook.readthedocs.io"
 issues = "https://github.com/MicaelJarniac/repeaterbook/issues"
 
+[project.optional-dependencies]
+mcp = [
+    "mcp>=1.2.0",
+]
+
+[project.scripts]
+repeaterbook-mcp = "repeaterbook.mcp.server:main"
+
 [dependency-groups]
 tests = [
     "coverage>=7.6.11",
