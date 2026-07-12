@@ -14,7 +14,7 @@ import os
 
 import attrs
 from anyio import Path
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from pycountry import countries
 from pycountry.db import Country  # noqa: TC002
 
