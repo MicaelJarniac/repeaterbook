@@ -9,3 +9,12 @@ repos:
     -   id: end-of-file-fixer
     -   id: trailing-whitespace
     -   id: requirements-txt-fixer
+-   repo: local
+    hooks:
+    -   id: repeaterbook-write-schema
+        name: regenerate RepeaterSpec JSON schema
+        entry: repeaterbook-write-schema
+        language: system
+        files: ^src/repeaterbook/mcp/(models\.py|schemas/repeater_spec\.schema\.json)$
+        pass_filenames: false
+        stages: [pre-commit]

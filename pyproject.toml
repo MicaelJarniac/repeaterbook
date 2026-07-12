@@ -50,6 +50,7 @@ mcp = [
 
 [project.scripts]
 repeaterbook-mcp = "repeaterbook.mcp.server:main"
+repeaterbook-write-schema = "repeaterbook.mcp.models:write_schema"
 
 [dependency-groups]
 tests = [

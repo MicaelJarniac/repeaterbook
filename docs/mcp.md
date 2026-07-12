@@ -45,3 +45,16 @@ Filter values: bands use library enum names `M_2`/`CM_70`/…, status `ON_AIR`/`
 Tools return **repeater-spec** rows — a neutral, source-agnostic shape carrying
 absolute rx/tx frequencies (the consuming radio derives duplex/offset). The JSON
 Schema is published at `repeaterbook/mcp/schemas/repeater_spec.schema.json`.
+
+### Regenerating the schema
+
+The schema is generated from the `RepeaterSpec` model. After changing the model,
+regenerate the committed file from your editable dev environment with:
+
+```bash
+repeaterbook-write-schema      # or: nox -s schema -- --write
+```
+
+A pre-commit hook regenerates it automatically when you commit a change to
+`models.py` or the schema file, and CI fails if the committed schema is out of
+date.

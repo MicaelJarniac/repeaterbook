@@ -90,6 +90,16 @@ def test_code(session: nox.Session) -> None:
     session.run("pytest")
 
 
+@nox.session(python=python_version, default=False)
+def schema(session: nox.Session) -> None:
+    """Verify (default) or regenerate (`-- --write`) the RepeaterSpec JSON Schema."""
+    install(session, groups=["tests"], root=True)
+    if "--write" in session.posargs:
+        session.run("repeaterbook-write-schema")
+    else:
+        session.run("pytest", "tests/mcp/test_schema_contract.py", "-q")
+
+
 @nox.session(python=python_version)
 def docs(session: nox.Session) -> None:
     """Build documentation with MkDocs."""
