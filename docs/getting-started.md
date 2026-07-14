@@ -4,7 +4,7 @@ This guide will walk you through the basics of using the **RepeaterBook Python C
 
 ## What is the RepeaterBook Python Client?
 
-The **RepeaterBook Python Client** is an unofficial, third-party Python library that provides a convenient interface to [RepeaterBook.com](https://www.repeaterbook.com/), a comprehensive database of amateur radio repeaters worldwide. It allows you to:
+The **RepeaterBook Python Client** is an unofficial, third-party Python library that provides a convenient interface to [RepeaterBook.com](https://repeaterbook.com/), a comprehensive database of amateur radio repeaters worldwide. It allows you to:
 
 - Download repeater data from the RepeaterBook.com API
 - Store repeater information in a local SQLite database

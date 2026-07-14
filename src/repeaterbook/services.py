@@ -264,7 +264,7 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
 class RepeaterBookAPI:
     """Unofficial client for the RepeaterBook.com API.
 
-    Must read https://www.repeaterbook.com/wiki/doku.php?id=api before using.
+    Must read https://repeaterbook.com/wiki/doku.php?id=api before using.
 
     Attributes:
         base_url: The RepeaterBook API base URL.

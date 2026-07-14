@@ -10,7 +10,7 @@ No. RepeaterBook Python Client is an independent, community-maintained library t
 
 ### What is the RepeaterBook Python Client?
 
-The RepeaterBook Python Client is an unofficial, third-party Python library that provides programmatic access to the [RepeaterBook.com](https://www.repeaterbook.com/) database of amateur radio repeaters worldwide. It allows you to download, query, and analyze repeater data for various amateur radio applications.
+The RepeaterBook Python Client is an unofficial, third-party Python library that provides programmatic access to the [RepeaterBook.com](https://repeaterbook.com/) database of amateur radio repeaters worldwide. It allows you to download, query, and analyze repeater data for various amateur radio applications.
 
 ### Do I need an API key?
 
@@ -558,7 +558,7 @@ import aiohttp
 import asyncio
 
 async def test_api():
-    url = "https://www.repeaterbook.com/api/export.php?country=Brazil"
+    url = "https://repeaterbook.com/api/export.php?country=Brazil"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             print(f"Status: {response.status}")
@@ -577,7 +577,7 @@ asyncio.run(test_api())
 
 ## Related Resources
 
-- [RepeaterBook.com Official API Docs](https://www.repeaterbook.com/wiki/doku.php?id=api)
+- [RepeaterBook.com Official API Docs](https://repeaterbook.com/wiki/doku.php?id=api)
 - [SQLModel Documentation](https://sqlmodel.tiangolo.com/)
 - [aiohttp Documentation](https://docs.aiohttp.org/)
 - [pycountry Documentation](https://github.com/flyingcircusio/pycountry)
