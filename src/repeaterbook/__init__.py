@@ -1,4 +1,4 @@
-"""Python utility to work with data from RepeaterBook."""
+"""Unofficial third-party Python client for the RepeaterBook.com API."""
 
 from __future__ import annotations
 

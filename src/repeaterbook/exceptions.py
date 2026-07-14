@@ -1,4 +1,4 @@
-"""Custom exceptions for RepeaterBook library."""
+"""Custom exceptions for the RepeaterBook Python Client."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ __all__: tuple[str, ...] = (
 
 
 class RepeaterBookError(Exception):
-    """Base exception for RepeaterBook library.
+    """Base exception for the RepeaterBook Python Client.
 
-    All RepeaterBook-specific exceptions inherit from this class,
+    All RepeaterBook Python Client exceptions inherit from this class,
     making it easy to catch all library errors with a single except clause.
     """
 

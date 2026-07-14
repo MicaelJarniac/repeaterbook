@@ -1,12 +1,16 @@
 # FAQ
 
-Frequently asked questions about **RepeaterBook**.
+Frequently asked questions about the **RepeaterBook Python Client**.
 
 ## General Questions
 
-### What is RepeaterBook?
+### Is this an official RepeaterBook.com project?
 
-RepeaterBook is a Python library that provides programmatic access to the [RepeaterBook.com](https://www.repeaterbook.com/) database of amateur radio repeaters worldwide. It allows you to download, query, and analyze repeater data for various amateur radio applications.
+No. RepeaterBook Python Client is an independent, community-maintained library that provides programmatic access to RepeaterBook.com's public API. It is not affiliated with, endorsed by, or officially supported by RepeaterBook.com.
+
+### What is the RepeaterBook Python Client?
+
+The RepeaterBook Python Client is an unofficial, third-party Python library that provides programmatic access to the [RepeaterBook.com](https://www.repeaterbook.com/) database of amateur radio repeaters worldwide. It allows you to download, query, and analyze repeater data for various amateur radio applications.
 
 ### Do I need an API key?
 
@@ -18,7 +22,7 @@ No! The RepeaterBook API is public and doesn't require authentication or an API 
 
 ### What data is available?
 
-RepeaterBook provides comprehensive repeater data including:
+RepeaterBook.com provides comprehensive repeater data including:
 
 - Frequencies (input/output)
 - Location (lat/lon)
@@ -477,9 +481,9 @@ Include:
 
 ## Error Handling
 
-### What exceptions does RepeaterBook raise?
+### What exceptions does the RepeaterBook Python Client raise?
 
-RepeaterBook uses a hierarchy of custom exceptions:
+The RepeaterBook Python Client uses a hierarchy of custom exceptions:
 
 | Exception | When Raised |
 |-----------|------------|

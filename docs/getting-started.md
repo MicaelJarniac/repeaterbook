@@ -1,12 +1,12 @@
 # Getting Started
 
-This guide will walk you through the basics of using **RepeaterBook** to access and work with amateur radio repeater data.
+This guide will walk you through the basics of using the **RepeaterBook Python Client** to access and work with amateur radio repeater data.
 
-## What is RepeaterBook?
+## What is the RepeaterBook Python Client?
 
-**RepeaterBook** is a Python library that provides a convenient interface to [RepeaterBook.com](https://www.repeaterbook.com/), a comprehensive database of amateur radio repeaters worldwide. It allows you to:
+The **RepeaterBook Python Client** is an unofficial, third-party Python library that provides a convenient interface to [RepeaterBook.com](https://www.repeaterbook.com/), a comprehensive database of amateur radio repeaters worldwide. It allows you to:
 
-- Download repeater data from the RepeaterBook API
+- Download repeater data from the RepeaterBook.com API
 - Store repeater information in a local SQLite database
 - Query repeaters by location, frequency, capabilities, and more
 - Filter repeaters based on distance from a point
@@ -54,7 +54,7 @@ To install the latest development version:
 
 ### 1. Download Repeater Data
 
-First, let's download repeater data for a specific region. RepeaterBook provides data for different countries and states.
+First, let's download repeater data for a specific region. RepeaterBook.com provides data for different countries and states.
 
 ```python
 import asyncio
@@ -234,7 +234,7 @@ if __name__ == "__main__":
 Now that you understand the basics, explore:
 
 - [Usage Guide](usage.md) - Detailed usage examples and patterns
-- [Architecture](architecture.md) - Understanding how RepeaterBook works
+- [Architecture](architecture.md) - Understanding how the RepeaterBook Python Client works
 - [Examples](examples.md) - Real-world use cases
 - [API Reference](api.md) - Complete API documentation
 - [FAQ](faq.md) - Common questions and troubleshooting

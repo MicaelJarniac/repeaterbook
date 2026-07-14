@@ -74,11 +74,13 @@
 [code-of-conduct]: CODE_OF_CONDUCT.md
 <!---->
 
-# RepeaterBook
+# RepeaterBook Python Client
 
-Welcome to **RepeaterBook's** documentation!
+> **Unofficial project.** RepeaterBook Python Client is an independent, community-maintained library and is **not affiliated with, endorsed by, or officially supported by RepeaterBook.com**. "RepeaterBook" is a trademark of its respective owner. For the official website and API, visit <https://www.repeaterbook.com/>.
 
-**RepeaterBook** is a Python library that provides a powerful and convenient interface to [RepeaterBook.com](https://www.repeaterbook.com/), the world's largest database of amateur radio repeaters. With this library, you can programmatically download, query, and analyze repeater data for various amateur radio applications.
+Welcome to the **RepeaterBook Python Client** documentation!
+
+**RepeaterBook Python Client** is an unofficial, third-party Python library that provides a powerful and convenient interface to the [RepeaterBook.com](https://www.repeaterbook.com/) API — the world's largest database of amateur radio repeaters. With this library, you can programmatically download, query, and analyze repeater data for various amateur radio applications.
 
 ## Features
 
@@ -145,7 +147,7 @@ asyncio.run(find_nearby_repeaters())
 
 [Read the full documentation][docs]
 
-Read RepeaterBook's official [API documentation](https://www.repeaterbook.com/wiki/doku.php?id=api) for more information about the upstream API.
+Read RepeaterBook.com's official [API documentation](https://www.repeaterbook.com/wiki/doku.php?id=api) for more information about the upstream API.
 
 ## Use Cases
 
