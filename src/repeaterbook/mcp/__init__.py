@@ -10,4 +10,4 @@ __all__: tuple[str, ...] = (
     "RepeaterSpec",
 )
 
-from repeaterbook.mcp.models import RepeaterMode, RepeaterSpec
+from repeaterbook.spec import RepeaterMode, RepeaterSpec

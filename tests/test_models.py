@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import pycountry
 import pytest
@@ -20,6 +21,10 @@ from repeaterbook.models import (
     Status,
     Use,
 )
+from repeaterbook.spec import DmrParams, FmParams, RepeaterMode
+
+if TYPE_CHECKING:
+    from tests._types import SampleRepeaterFactory
 
 
 class TestStatusEnum:
@@ -322,3 +327,50 @@ class TestExportWorldQuery:
             "region": ["South America"],
         }
         assert query["region"] == ["South America"]
+
+
+def test_repeater_dmr_accessor_returns_none_when_incapable(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """The dmr accessor should be None when the repeater isn't DMR-capable."""
+    rep = sample_repeater(dmr_capable=False, dmr_color_code="1")
+    assert rep.dmr is None
+
+
+def test_repeater_dmr_accessor_populates_params(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """The dmr accessor should carry the DMR ID and color code."""
+    rep = sample_repeater(dmr_capable=True, dmr_id="5051", dmr_color_code="1")
+    assert rep.dmr == DmrParams(dmr_id="5051", color_code="1")
+
+
+def test_repeater_fm_accessor_carries_bandwidth(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """The fm accessor should carry the FM bandwidth."""
+    rep = sample_repeater(analog_capable=True, fm_bandwidth=Decimal("12.5"))
+    assert rep.fm == FmParams(bandwidth_khz=Decimal("12.5"))
+
+
+def test_repeater_modes_reflects_capabilities(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """Modes should reflect exactly the capability flags that are set."""
+    rep = sample_repeater(analog_capable=True, yaesu_system_fusion_capable=True)
+    assert rep.modes == frozenset({RepeaterMode.FM, RepeaterMode.FUSION})
+
+
+def test_accessors_do_not_change_persistence_surface(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """The accessors must be invisible to SQL/pydantic: no new column, no field."""
+    # SQLModel exposes __table__ at runtime; the type stubs don't declare it.
+    table = Repeater.__table__  # type: ignore[attr-defined]
+    columns = {c.name for c in table.columns}
+    assert "dmr" not in columns
+    assert "fm" not in columns
+    assert "modes" not in columns
+    assert "dmr" not in Repeater.model_fields
+    rep = sample_repeater(dmr_capable=True, dmr_id="5051")
+    assert "dmr" not in rep.model_dump()

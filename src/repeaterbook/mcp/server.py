@@ -21,12 +21,9 @@ from pycountry.db import Country  # noqa: TC002
 from repeaterbook.database import RepeaterBook
 from repeaterbook.exceptions import RepeaterBookUnauthorizedError
 from repeaterbook.mcp import service
-from repeaterbook.mcp.models import (
-    RepeaterMode,
-    RepeaterSpec,
-)
 from repeaterbook.models import ExportQuery, Mode
 from repeaterbook.services import RepeaterBookAPI
+from repeaterbook.spec import RepeaterMode, RepeaterSpec
 from repeaterbook.utils import LatLon
 
 mcp = FastMCP("repeaterbook")

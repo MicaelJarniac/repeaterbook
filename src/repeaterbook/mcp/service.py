@@ -9,17 +9,16 @@ from typing import TYPE_CHECKING, TypeVar
 
 from haversine import Unit, haversine  # type: ignore[import-untyped]
 
-from repeaterbook.mcp.mapper import repeater_to_specs
-from repeaterbook.mcp.models import RepeaterMode
 from repeaterbook.models import Repeater, Status, Use
 from repeaterbook.queries import Bands, band, filter_radius, square
+from repeaterbook.spec import RepeaterMode, repeater_to_specs
 from repeaterbook.utils import LatLon, Radius
 
 if TYPE_CHECKING:
     from repeaterbook.database import RepeaterBook
-    from repeaterbook.mcp.models import RepeaterSpec
     from repeaterbook.models import ExportQuery
     from repeaterbook.services import RepeaterBookAPI
+    from repeaterbook.spec import RepeaterSpec
 
 _EnumT = TypeVar("_EnumT", bound=Enum)
 

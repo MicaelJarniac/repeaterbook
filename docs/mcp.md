@@ -44,7 +44,7 @@ Filter values: bands use library enum names `M_2`/`CM_70`/…, status `ON_AIR`/`
 
 Tools return **repeater-spec** rows — a neutral, source-agnostic shape carrying
 absolute rx/tx frequencies (the consuming radio derives duplex/offset). The JSON
-Schema is published at `repeaterbook/mcp/schemas/repeater_spec.schema.json`.
+Schema is published at `repeaterbook/schemas/repeater_spec.schema.json`.
 
 ### Regenerating the schema
 

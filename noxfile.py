@@ -97,7 +97,9 @@ def schema(session: nox.Session) -> None:
     if "--write" in session.posargs:
         session.run("repeaterbook-write-schema")
     else:
-        session.run("pytest", "tests/mcp/test_schema_contract.py", "-q")
+        session.run(
+            "pytest", "tests/test_spec.py::test_committed_schema_matches_model", "-q"
+        )
 
 
 @nox.session(python=python_version)
