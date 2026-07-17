@@ -1,4 +1,4 @@
-"""Internal database module for RepeaterBook."""
+"""Internal database module for the RepeaterBook Python Client."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 @attrs.frozen
 class RepeaterBook:
-    """RepeaterBook API client."""
+    """Local database for repeater data from the RepeaterBook.com API."""
 
     working_dir: Path = attrs.Factory(Path)
     database: str = "repeaterbook.db"

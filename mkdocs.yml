@@ -1,5 +1,5 @@
-site_name: "RepeaterBook"
-site_description: "Python utility to work with data from RepeaterBook."
+site_name: "RepeaterBook Python Client"
+site_description: "Unofficial third-party Python client for the RepeaterBook.com API."
 site_url: "https://repeaterbook.readthedocs.io"
 repo_url: "https://github.com/MicaelJarniac/repeaterbook"
 repo_name: "MicaelJarniac/repeaterbook"

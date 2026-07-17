@@ -1,6 +1,6 @@
 # Examples
 
-Real-world examples of using **RepeaterBook** for common amateur radio tasks.
+Real-world examples of using the **RepeaterBook Python Client** for common amateur radio tasks.
 
 ## Example 1: Build a Repeater Directory Website
 
@@ -115,7 +115,7 @@ from repeaterbook.utils import LatLon, Radius
 import pycountry
 
 async def generate_codeplug():
-    """Generate DMR codeplug from RepeaterBook data."""
+    """Generate DMR codeplug from RepeaterBook.com data."""
 
     # Download California repeaters
     api = RepeaterBookAPI()

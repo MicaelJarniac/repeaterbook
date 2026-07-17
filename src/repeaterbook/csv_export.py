@@ -1,4 +1,4 @@
-"""CSV export functionality for RepeaterBook data."""
+"""CSV export functionality for RepeaterBook.com data."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 # Usage Guide
 
-This comprehensive guide covers all the features and capabilities of **RepeaterBook**.
+This comprehensive guide covers all the features and capabilities of the **RepeaterBook Python Client**.
 
 ## API Client
 
@@ -67,7 +67,7 @@ repeaters = asyncio.run(download_example())
 
 #### Caching
 
-The API client automatically caches responses to reduce load on the RepeaterBook servers and improve performance:
+The API client automatically caches responses to reduce load on RepeaterBook.com's servers and improve performance:
 
 - Default cache directory: `.repeaterbook_cache/`
 - Default cache TTL: 3600 seconds (1 hour)
@@ -712,7 +712,7 @@ results3 = rb.query(Repeater.dmr_capable == True)
 
 ## Error Handling
 
-RepeaterBook provides custom exceptions for robust error handling:
+The RepeaterBook Python Client provides custom exceptions for robust error handling:
 
 ```python
 from repeaterbook import (
@@ -760,7 +760,7 @@ The `Repeater` model includes built-in validation:
 
 ## Logging
 
-RepeaterBook uses `loguru` for logging:
+The RepeaterBook Python Client uses `loguru` for logging:
 
 ```python
 from loguru import logger
