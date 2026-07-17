@@ -43,11 +43,21 @@ changelog = "https://github.com/MicaelJarniac/repeaterbook/blob/main/docs/CHANGE
 documentation = "https://repeaterbook.readthedocs.io"
 issues = "https://github.com/MicaelJarniac/repeaterbook/issues"
 
+[project.optional-dependencies]
+mcp = [
+    "fastmcp>=3.0.0",
+]
+
+[project.scripts]
+repeaterbook-mcp = "repeaterbook.mcp.server:main"
+repeaterbook-write-schema = "repeaterbook.spec:write_schema"
+
 [dependency-groups]
 tests = [
     "coverage>=7.6.11",
     "hypothesis>=6.125.3",
     "inline-snapshot>=0.20.2",
+    "jsonschema>=4.26.0",
     "pytest>=8.3.4",
     "pytest-benchmark>=5.1.0",
     "pytest-cov>=6.0.0",
@@ -68,6 +78,7 @@ typing = [
     "mypy>=1.15.0",
     # Typing stubs go here
     "types-tqdm>=4.67.0.20250319",
+    "types-jsonschema>=4.26.0",
 ]
 linting = [
     "ruff>=0.9.6",

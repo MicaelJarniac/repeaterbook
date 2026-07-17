@@ -1,0 +1,1863 @@
+{
+  "$defs": {
+    "DStarParams": {
+      "additionalProperties": false,
+      "description": "RepeaterBook carries no D-STAR parameters; intentionally empty.",
+      "properties": {},
+      "title": "DStarParams",
+      "type": "object"
+    },
+    "DStarSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "callsign": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Callsign"
+        },
+        "rx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rx Frequency Mhz"
+        },
+        "tx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Tx Frequency Mhz"
+        },
+        "ctcss_tx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Tx Hz"
+        },
+        "ctcss_rx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Rx Hz"
+        },
+        "dcs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dcs Code"
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "distance_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Distance Km"
+        },
+        "operational_status": {
+          "enum": [
+            "OFF_AIR",
+            "ON_AIR",
+            "UNKNOWN"
+          ],
+          "title": "Operational Status",
+          "type": "string"
+        },
+        "use": {
+          "enum": [
+            "OPEN",
+            "PRIVATE",
+            "CLOSED"
+          ],
+          "title": "Use",
+          "type": "string"
+        },
+        "band": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Band"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "last_update": {
+          "format": "date",
+          "title": "Last Update",
+          "type": "string"
+        },
+        "source": {
+          "default": "repeaterbook",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "mode": {
+          "const": "DSTAR",
+          "default": "DSTAR",
+          "title": "Mode",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/DStarParams",
+          "default": {}
+        }
+      },
+      "required": [
+        "name",
+        "callsign",
+        "rx_frequency_mhz",
+        "tx_frequency_mhz",
+        "ctcss_tx_hz",
+        "ctcss_rx_hz",
+        "dcs_code",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "operational_status",
+        "use",
+        "band",
+        "notes",
+        "last_update",
+        "source_id"
+      ],
+      "title": "DStarSpec",
+      "type": "object"
+    },
+    "DmrParams": {
+      "additionalProperties": false,
+      "properties": {
+        "dmr_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dmr Id"
+        },
+        "color_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color Code"
+        }
+      },
+      "title": "DmrParams",
+      "type": "object"
+    },
+    "DmrSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "callsign": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Callsign"
+        },
+        "rx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rx Frequency Mhz"
+        },
+        "tx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Tx Frequency Mhz"
+        },
+        "ctcss_tx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Tx Hz"
+        },
+        "ctcss_rx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Rx Hz"
+        },
+        "dcs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dcs Code"
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "distance_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Distance Km"
+        },
+        "operational_status": {
+          "enum": [
+            "OFF_AIR",
+            "ON_AIR",
+            "UNKNOWN"
+          ],
+          "title": "Operational Status",
+          "type": "string"
+        },
+        "use": {
+          "enum": [
+            "OPEN",
+            "PRIVATE",
+            "CLOSED"
+          ],
+          "title": "Use",
+          "type": "string"
+        },
+        "band": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Band"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "last_update": {
+          "format": "date",
+          "title": "Last Update",
+          "type": "string"
+        },
+        "source": {
+          "default": "repeaterbook",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "mode": {
+          "const": "DMR",
+          "default": "DMR",
+          "title": "Mode",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/DmrParams",
+          "default": {
+            "dmr_id": null,
+            "color_code": null
+          }
+        }
+      },
+      "required": [
+        "name",
+        "callsign",
+        "rx_frequency_mhz",
+        "tx_frequency_mhz",
+        "ctcss_tx_hz",
+        "ctcss_rx_hz",
+        "dcs_code",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "operational_status",
+        "use",
+        "band",
+        "notes",
+        "last_update",
+        "source_id"
+      ],
+      "title": "DmrSpec",
+      "type": "object"
+    },
+    "FmParams": {
+      "additionalProperties": false,
+      "properties": {
+        "bandwidth_khz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bandwidth Khz"
+        }
+      },
+      "title": "FmParams",
+      "type": "object"
+    },
+    "FmSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "callsign": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Callsign"
+        },
+        "rx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rx Frequency Mhz"
+        },
+        "tx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Tx Frequency Mhz"
+        },
+        "ctcss_tx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Tx Hz"
+        },
+        "ctcss_rx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Rx Hz"
+        },
+        "dcs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dcs Code"
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "distance_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Distance Km"
+        },
+        "operational_status": {
+          "enum": [
+            "OFF_AIR",
+            "ON_AIR",
+            "UNKNOWN"
+          ],
+          "title": "Operational Status",
+          "type": "string"
+        },
+        "use": {
+          "enum": [
+            "OPEN",
+            "PRIVATE",
+            "CLOSED"
+          ],
+          "title": "Use",
+          "type": "string"
+        },
+        "band": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Band"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "last_update": {
+          "format": "date",
+          "title": "Last Update",
+          "type": "string"
+        },
+        "source": {
+          "default": "repeaterbook",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "mode": {
+          "const": "FM",
+          "default": "FM",
+          "title": "Mode",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FmParams",
+          "default": {
+            "bandwidth_khz": null
+          }
+        }
+      },
+      "required": [
+        "name",
+        "callsign",
+        "rx_frequency_mhz",
+        "tx_frequency_mhz",
+        "ctcss_tx_hz",
+        "ctcss_rx_hz",
+        "dcs_code",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "operational_status",
+        "use",
+        "band",
+        "notes",
+        "last_update",
+        "source_id"
+      ],
+      "title": "FmSpec",
+      "type": "object"
+    },
+    "FusionParams": {
+      "additionalProperties": false,
+      "properties": {
+        "digital_id_uplink": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Digital Id Uplink"
+        },
+        "digital_id_downlink": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Digital Id Downlink"
+        },
+        "dsc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dsc"
+        }
+      },
+      "title": "FusionParams",
+      "type": "object"
+    },
+    "FusionSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "callsign": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Callsign"
+        },
+        "rx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rx Frequency Mhz"
+        },
+        "tx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Tx Frequency Mhz"
+        },
+        "ctcss_tx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Tx Hz"
+        },
+        "ctcss_rx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Rx Hz"
+        },
+        "dcs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dcs Code"
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "distance_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Distance Km"
+        },
+        "operational_status": {
+          "enum": [
+            "OFF_AIR",
+            "ON_AIR",
+            "UNKNOWN"
+          ],
+          "title": "Operational Status",
+          "type": "string"
+        },
+        "use": {
+          "enum": [
+            "OPEN",
+            "PRIVATE",
+            "CLOSED"
+          ],
+          "title": "Use",
+          "type": "string"
+        },
+        "band": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Band"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "last_update": {
+          "format": "date",
+          "title": "Last Update",
+          "type": "string"
+        },
+        "source": {
+          "default": "repeaterbook",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "mode": {
+          "const": "FUSION",
+          "default": "FUSION",
+          "title": "Mode",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FusionParams",
+          "default": {
+            "digital_id_uplink": null,
+            "digital_id_downlink": null,
+            "dsc": null
+          }
+        }
+      },
+      "required": [
+        "name",
+        "callsign",
+        "rx_frequency_mhz",
+        "tx_frequency_mhz",
+        "ctcss_tx_hz",
+        "ctcss_rx_hz",
+        "dcs_code",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "operational_status",
+        "use",
+        "band",
+        "notes",
+        "last_update",
+        "source_id"
+      ],
+      "title": "FusionSpec",
+      "type": "object"
+    },
+    "M17Params": {
+      "additionalProperties": false,
+      "properties": {
+        "can": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Can"
+        }
+      },
+      "title": "M17Params",
+      "type": "object"
+    },
+    "M17Spec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "callsign": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Callsign"
+        },
+        "rx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rx Frequency Mhz"
+        },
+        "tx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Tx Frequency Mhz"
+        },
+        "ctcss_tx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Tx Hz"
+        },
+        "ctcss_rx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Rx Hz"
+        },
+        "dcs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dcs Code"
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "distance_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Distance Km"
+        },
+        "operational_status": {
+          "enum": [
+            "OFF_AIR",
+            "ON_AIR",
+            "UNKNOWN"
+          ],
+          "title": "Operational Status",
+          "type": "string"
+        },
+        "use": {
+          "enum": [
+            "OPEN",
+            "PRIVATE",
+            "CLOSED"
+          ],
+          "title": "Use",
+          "type": "string"
+        },
+        "band": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Band"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "last_update": {
+          "format": "date",
+          "title": "Last Update",
+          "type": "string"
+        },
+        "source": {
+          "default": "repeaterbook",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "mode": {
+          "const": "M17",
+          "default": "M17",
+          "title": "Mode",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/M17Params",
+          "default": {
+            "can": null
+          }
+        }
+      },
+      "required": [
+        "name",
+        "callsign",
+        "rx_frequency_mhz",
+        "tx_frequency_mhz",
+        "ctcss_tx_hz",
+        "ctcss_rx_hz",
+        "dcs_code",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "operational_status",
+        "use",
+        "band",
+        "notes",
+        "last_update",
+        "source_id"
+      ],
+      "title": "M17Spec",
+      "type": "object"
+    },
+    "NxdnParams": {
+      "additionalProperties": false,
+      "description": "RepeaterBook carries no NXDN parameters; intentionally empty.",
+      "properties": {},
+      "title": "NxdnParams",
+      "type": "object"
+    },
+    "NxdnSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "callsign": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Callsign"
+        },
+        "rx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rx Frequency Mhz"
+        },
+        "tx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Tx Frequency Mhz"
+        },
+        "ctcss_tx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Tx Hz"
+        },
+        "ctcss_rx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Rx Hz"
+        },
+        "dcs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dcs Code"
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "distance_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Distance Km"
+        },
+        "operational_status": {
+          "enum": [
+            "OFF_AIR",
+            "ON_AIR",
+            "UNKNOWN"
+          ],
+          "title": "Operational Status",
+          "type": "string"
+        },
+        "use": {
+          "enum": [
+            "OPEN",
+            "PRIVATE",
+            "CLOSED"
+          ],
+          "title": "Use",
+          "type": "string"
+        },
+        "band": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Band"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "last_update": {
+          "format": "date",
+          "title": "Last Update",
+          "type": "string"
+        },
+        "source": {
+          "default": "repeaterbook",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "mode": {
+          "const": "NXDN",
+          "default": "NXDN",
+          "title": "Mode",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/NxdnParams",
+          "default": {}
+        }
+      },
+      "required": [
+        "name",
+        "callsign",
+        "rx_frequency_mhz",
+        "tx_frequency_mhz",
+        "ctcss_tx_hz",
+        "ctcss_rx_hz",
+        "dcs_code",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "operational_status",
+        "use",
+        "band",
+        "notes",
+        "last_update",
+        "source_id"
+      ],
+      "title": "NxdnSpec",
+      "type": "object"
+    },
+    "P25Params": {
+      "additionalProperties": false,
+      "properties": {
+        "nac": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nac"
+        }
+      },
+      "title": "P25Params",
+      "type": "object"
+    },
+    "P25Spec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "callsign": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Callsign"
+        },
+        "rx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rx Frequency Mhz"
+        },
+        "tx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Tx Frequency Mhz"
+        },
+        "ctcss_tx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Tx Hz"
+        },
+        "ctcss_rx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Rx Hz"
+        },
+        "dcs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dcs Code"
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "distance_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Distance Km"
+        },
+        "operational_status": {
+          "enum": [
+            "OFF_AIR",
+            "ON_AIR",
+            "UNKNOWN"
+          ],
+          "title": "Operational Status",
+          "type": "string"
+        },
+        "use": {
+          "enum": [
+            "OPEN",
+            "PRIVATE",
+            "CLOSED"
+          ],
+          "title": "Use",
+          "type": "string"
+        },
+        "band": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Band"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "last_update": {
+          "format": "date",
+          "title": "Last Update",
+          "type": "string"
+        },
+        "source": {
+          "default": "repeaterbook",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "mode": {
+          "const": "P25",
+          "default": "P25",
+          "title": "Mode",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/P25Params",
+          "default": {
+            "nac": null
+          }
+        }
+      },
+      "required": [
+        "name",
+        "callsign",
+        "rx_frequency_mhz",
+        "tx_frequency_mhz",
+        "ctcss_tx_hz",
+        "ctcss_rx_hz",
+        "dcs_code",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "operational_status",
+        "use",
+        "band",
+        "notes",
+        "last_update",
+        "source_id"
+      ],
+      "title": "P25Spec",
+      "type": "object"
+    },
+    "TetraParams": {
+      "additionalProperties": false,
+      "properties": {
+        "mcc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mcc"
+        },
+        "mnc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mnc"
+        }
+      },
+      "title": "TetraParams",
+      "type": "object"
+    },
+    "TetraSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "callsign": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Callsign"
+        },
+        "rx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rx Frequency Mhz"
+        },
+        "tx_frequency_mhz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Tx Frequency Mhz"
+        },
+        "ctcss_tx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Tx Hz"
+        },
+        "ctcss_rx_hz": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ctcss Rx Hz"
+        },
+        "dcs_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dcs Code"
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "distance_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Distance Km"
+        },
+        "operational_status": {
+          "enum": [
+            "OFF_AIR",
+            "ON_AIR",
+            "UNKNOWN"
+          ],
+          "title": "Operational Status",
+          "type": "string"
+        },
+        "use": {
+          "enum": [
+            "OPEN",
+            "PRIVATE",
+            "CLOSED"
+          ],
+          "title": "Use",
+          "type": "string"
+        },
+        "band": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Band"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "last_update": {
+          "format": "date",
+          "title": "Last Update",
+          "type": "string"
+        },
+        "source": {
+          "default": "repeaterbook",
+          "title": "Source",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "mode": {
+          "const": "TETRA",
+          "default": "TETRA",
+          "title": "Mode",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/TetraParams",
+          "default": {
+            "mcc": null,
+            "mnc": null
+          }
+        }
+      },
+      "required": [
+        "name",
+        "callsign",
+        "rx_frequency_mhz",
+        "tx_frequency_mhz",
+        "ctcss_tx_hz",
+        "ctcss_rx_hz",
+        "dcs_code",
+        "latitude",
+        "longitude",
+        "distance_km",
+        "operational_status",
+        "use",
+        "band",
+        "notes",
+        "last_update",
+        "source_id"
+      ],
+      "title": "TetraSpec",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "DMR": "#/$defs/DmrSpec",
+      "DSTAR": "#/$defs/DStarSpec",
+      "FM": "#/$defs/FmSpec",
+      "FUSION": "#/$defs/FusionSpec",
+      "M17": "#/$defs/M17Spec",
+      "NXDN": "#/$defs/NxdnSpec",
+      "P25": "#/$defs/P25Spec",
+      "TETRA": "#/$defs/TetraSpec"
+    },
+    "propertyName": "mode"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/FmSpec"
+    },
+    {
+      "$ref": "#/$defs/DmrSpec"
+    },
+    {
+      "$ref": "#/$defs/DStarSpec"
+    },
+    {
+      "$ref": "#/$defs/FusionSpec"
+    },
+    {
+      "$ref": "#/$defs/P25Spec"
+    },
+    {
+      "$ref": "#/$defs/NxdnSpec"
+    },
+    {
+      "$ref": "#/$defs/TetraSpec"
+    },
+    {
+      "$ref": "#/$defs/M17Spec"
+    }
+  ]
+}
