@@ -24,6 +24,28 @@ api = RepeaterBookAPI(
 )
 ```
 
+#### Authentication
+
+As of RepeaterBook's [2026-03-03 API policy](https://www.repeaterbook.com/wiki/doku.php?id=api), the export endpoints require an approved per-user API token (an `rbuapp_...` token), sent via the `X-RB-App-Token` header. Pass your token with the `app_token` argument — typically loaded from an environment variable so it never ends up in source control:
+
+```python
+import os
+
+from repeaterbook.services import RepeaterBookAPI
+
+api = RepeaterBookAPI(
+    app_token=os.environ["REPEATERBOOK"],
+    app_name="my-app",
+    app_version="1.0.0",
+    app_contact="you@example.org",
+)
+```
+
+The `app_name`, `app_version`, and `app_contact` values form the `User-Agent` that RepeaterBook uses to identify your application; provide accurate values, as generic or mismatched user agents may be rejected.
+
+!!! warning "Never share or distribute a token"
+    This library is a *distributed* client: each user must request and use their own `rbuapp_...` token. Do not embed a shared `app_...` token in source code, installers, or public repositories.
+
 #### Downloading Repeater Data
 
 The `download()` method fetches repeater data from the API:

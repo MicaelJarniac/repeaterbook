@@ -95,8 +95,11 @@ Welcome to the **RepeaterBook Python Client** documentation!
 
 ## Quick Example
 
+> This library requires a per-user RepeaterBook API token. [Request access](https://repeaterbook.com/wiki/doku.php?id=api), generate your token, and expose it as the `REPEATERBOOK` environment variable (for example `export REPEATERBOOK="rbuapp_..."`).
+
 ```python
 import asyncio
+import os
 from repeaterbook import RepeaterBook, Repeater
 from repeaterbook.services import RepeaterBookAPI
 from repeaterbook.models import ExportQuery, Status
@@ -106,7 +109,7 @@ import pycountry
 
 async def find_nearby_repeaters():
     # Download repeater data
-    api = RepeaterBookAPI()
+    api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
     brazil = pycountry.countries.get(name="Brazil")
     repeaters = await api.download(query=ExportQuery(countries={brazil}))
 

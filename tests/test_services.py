@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pycountry
 import pytest
@@ -13,6 +13,9 @@ from yarl import URL
 
 from repeaterbook.exceptions import (
     RepeaterBookAPIError,
+    RepeaterBookForbiddenError,
+    RepeaterBookRateLimitError,
+    RepeaterBookUnauthorizedError,
     RepeaterBookValidationError,
 )
 from repeaterbook.models import (
@@ -32,6 +35,8 @@ from repeaterbook.services import (
 
 if TYPE_CHECKING:
     from pathlib import Path as StdPath
+
+    from pycountry.db import Country
 
 from anyio import Path
 
@@ -266,7 +271,7 @@ class TestRepeaterBookAPIUrls:
     def test_urls_export_na_country_routes_to_na_only(self) -> None:
         """Query with NA country (US) should only query NA endpoint."""
         api = RepeaterBookAPI()
-        us = pycountry.countries.lookup("United States")
+        us = cast("Country", pycountry.countries.lookup("United States"))
         query = ExportQuery(countries=frozenset({us}))
         urls = api.urls_export(query)
         assert len(urls) == 1
@@ -278,7 +283,7 @@ class TestRepeaterBookAPIUrls:
     def test_urls_export_row_country_routes_to_row_only(self) -> None:
         """Query with ROW country (Brazil) should only query ROW endpoint."""
         api = RepeaterBookAPI()
-        brazil = pycountry.countries.lookup("Brazil")
+        brazil = cast("Country", pycountry.countries.lookup("Brazil"))
         query = ExportQuery(countries=frozenset({brazil}))
         urls = api.urls_export(query)
         assert len(urls) == 1
@@ -289,8 +294,8 @@ class TestRepeaterBookAPIUrls:
     def test_urls_export_mixed_countries_routes_to_both(self) -> None:
         """Query with both NA and ROW countries should query both endpoints."""
         api = RepeaterBookAPI()
-        us = pycountry.countries.lookup("United States")
-        brazil = pycountry.countries.lookup("Brazil")
+        us = cast("Country", pycountry.countries.lookup("United States"))
+        brazil = cast("Country", pycountry.countries.lookup("Brazil"))
         query = ExportQuery(countries=frozenset({us, brazil}))
         urls = api.urls_export(query)
         assert len(urls) == 2
@@ -368,6 +373,47 @@ class TestRepeaterBookAPIExport:
                 await api.export_json(url)
 
     @pytest.mark.anyio
+    async def test_export_json_raises_on_modern_api_error(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """export_json should preserve modern API error envelope details."""
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response(
+                {
+                    "ok": False,
+                    "error_code": "bad_query",
+                    "message": "Invalid query.",
+                }
+            )
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookAPIError, match="Invalid query") as exc:
+                await api.export_json(url)
+
+        assert exc.value.error_code == "bad_query"
+        assert exc.value.status_code == 200
+
+    @pytest.mark.anyio
+    async def test_export_json_error_code_alone_is_api_error(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """An error code alone should identify a 200 response as an API error."""
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response({"error_code": "bad_query"})
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookAPIError, match="Unknown API error"):
+                await api.export_json(url)
+
+    @pytest.mark.anyio
     async def test_export_json_raises_on_missing_count(
         self,
         tmp_path: StdPath,
@@ -415,3 +461,228 @@ class TestRepeaterBookAPIExport:
             result = await api.export_json(url)
             assert result["count"] == 1
             assert len(result["results"]) == 1
+
+
+class TestRepeaterBookAPIAuth:
+    """Tests for RepeaterBookAPI authentication headers."""
+
+    def test_headers_without_token_omit_auth(self) -> None:
+        """Without a token, no authentication header is sent."""
+        headers = dict(RepeaterBookAPI().headers)
+        assert "User-Agent" in headers
+        assert "X-RB-App-Token" not in headers
+        assert "Authorization" not in headers
+
+    def test_headers_with_token_use_x_rb_app_token(self) -> None:
+        """With a token, the raw token is sent via the X-RB-App-Token header."""
+        headers = dict(RepeaterBookAPI(app_token="rbuapp_test").headers)
+        assert headers["X-RB-App-Token"] == "rbuapp_test"
+        assert "Authorization" not in headers
+
+    @pytest.mark.anyio
+    async def test_auth_header_reaches_server(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """The X-RB-App-Token header should reach the server with the raw token."""
+        captured: dict[str, str | None] = {}
+
+        async def handler(request: web.Request) -> web.Response:
+            captured["X-RB-App-Token"] = request.headers.get("X-RB-App-Token")
+            captured["Authorization"] = request.headers.get("Authorization")
+            return web.json_response({"count": 0, "results": []})
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(app_token="rbuapp_test", working_dir=Path(tmp_path))
+            await api.export_json(url)
+
+        assert captured["X-RB-App-Token"] == "rbuapp_test"
+        assert captured["Authorization"] is None
+
+    @pytest.mark.anyio
+    async def test_export_json_raises_unauthorized_on_401(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """export_json should raise RepeaterBookUnauthorizedError on HTTP 401."""
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response(
+                {
+                    "ok": False,
+                    "error_code": "auth_invalid",
+                    "message": "Invalid user app token format.",
+                },
+                status=401,
+            )
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookUnauthorizedError) as exc:
+                await api.export_json(url)
+
+        assert exc.value.error_code == "auth_invalid"
+        assert exc.value.status_code == 401
+        assert "Invalid user app token format." in str(exc.value)
+
+    @pytest.mark.anyio
+    async def test_export_json_raises_api_error_on_500(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """export_json should raise RepeaterBookAPIError on other HTTP errors."""
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.Response(status=500)
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookAPIError, match="HTTP 500"):
+                await api.export_json(url)
+
+    @pytest.mark.anyio
+    async def test_non_dict_http_error_body_is_preserved(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """A non-dict JSON HTTP error body should be preserved as text."""
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response(["server error"], status=500)
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookAPIError, match="server error"):
+                await api.export_json(url)
+
+    @pytest.mark.anyio
+    async def test_user_agent_mismatch_is_rejected(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """A server gating on the app name rejects a mismatched User-Agent."""
+        approved = "RepeaterBook Python Client"
+
+        async def handler(request: web.Request) -> web.Response:
+            if not request.headers.get("User-Agent", "").startswith(approved):
+                return web.json_response(
+                    {
+                        "ok": False,
+                        "error_code": "ua_mismatch",
+                        "message": "Application User-Agent policy check failed.",
+                    },
+                    status=403,
+                )
+            return web.json_response({"count": 0, "results": []})
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(
+                app_token="rbuapp_test",
+                app_name="not-the-approved-app",
+                working_dir=Path(tmp_path),
+            )
+            with pytest.raises(RepeaterBookForbiddenError) as exc:
+                await api.export_json(url)
+
+        assert exc.value.error_code == "ua_mismatch"
+        assert exc.value.status_code == 403
+        assert "Application User-Agent" in str(exc.value)
+
+    @pytest.mark.anyio
+    async def test_rate_limit_error_has_retry_after(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """A 429 response should expose its numeric Retry-After delay."""
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response(
+                {
+                    "ok": False,
+                    "error_code": "rate_limited",
+                    "message": "Too many requests.",
+                },
+                status=429,
+                headers={"Retry-After": "30"},
+            )
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookRateLimitError) as exc:
+                await api.export_json(url)
+
+        assert exc.value.retry_after == 30.0
+        assert exc.value.error_code == "rate_limited"
+
+    @pytest.mark.anyio
+    async def test_rate_limit_http_date_is_parsed(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """A past Retry-After HTTP-date should produce a zero-second delay."""
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response(
+                {"ok": False, "message": "Too many requests."},
+                status=429,
+                headers={"Retry-After": "Wed, 21 Oct 2015 07:28:00 GMT"},
+            )
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookRateLimitError) as exc:
+                await api.export_json(url)
+
+        assert exc.value.retry_after == 0.0
+
+    @pytest.mark.parametrize("retry_after", [None, "not-a-date"])
+    @pytest.mark.anyio
+    async def test_unavailable_retry_after_is_none(
+        self,
+        retry_after: str | None,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """An absent or invalid Retry-After header should produce no delay."""
+
+        async def handler(_: web.Request) -> web.Response:
+            headers = {} if retry_after is None else {"Retry-After": retry_after}
+            return web.json_response(
+                {"ok": False, "message": "Too many requests."},
+                status=429,
+                headers=headers,
+            )
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookRateLimitError) as exc:
+                await api.export_json(url)
+
+        assert exc.value.retry_after is None
+        assert "retry_after" not in str(exc.value)
+
+    def test_api_error_does_not_leak_secret(self) -> None:
+        """Structured API error text should not expose authentication secrets."""
+        token = f"rbuapp_{RepeaterBookAPIError.__name__}"
+        exc = RepeaterBookAPIError(
+            "Invalid token",
+            status_code=401,
+            error_code="auth_invalid",
+            url="https://example.com/api/export.php",
+            body={
+                "X-RB-App-Token": token,
+                "Authorization": f"Bearer {token}",
+            },
+        )
+
+        text = str(exc)
+        assert token not in text
+        assert "X-RB-App-Token" not in text
+        assert "Authorization" not in text

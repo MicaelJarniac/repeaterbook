@@ -14,7 +14,25 @@ The RepeaterBook Python Client is an unofficial, third-party Python library that
 
 ### Do I need an API key?
 
-No! The RepeaterBook API is public and doesn't require authentication or an API key. However, please be respectful of their servers by:
+Yes. As of RepeaterBook's [2026-03-03 API policy](https://www.repeaterbook.com/wiki/doku.php?id=api), the export endpoints require an approved per-user API token (an `rbuapp_...` token). Earlier releases of this library sent `Authorization: Bearer <token>`, which the live API now rejects with `401 auth_missing` — you must supply a token, and it is sent via the preferred `X-RB-App-Token` header.
+
+To use the API:
+
+- Ask RepeaterBook to approve your application. This library is a *distributed* client, so each user must use their **own** token — see the [API policy](https://www.repeaterbook.com/wiki/doku.php?id=api).
+- Generate a personal token from your RepeaterBook account.
+- Pass it to `RepeaterBookAPI`, for example from an environment variable:
+
+```python
+import os
+
+from repeaterbook.services import RepeaterBookAPI
+
+api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
+```
+
+**Never share or distribute a token.** RepeaterBook's policy prohibits embedding a shared `app_...` token in source code, installers, or public repositories.
+
+Please also be respectful of their servers by:
 
 - Using the built-in caching (enabled by default)
 - Not making excessive requests
