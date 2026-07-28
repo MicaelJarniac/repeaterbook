@@ -486,3 +486,26 @@ class TestRepeaterBookAPIAuth:
             api = RepeaterBookAPI(working_dir=Path(tmp_path))
             with pytest.raises(RepeaterBookAPIError):
                 await api.export_json(url)
+
+    @pytest.mark.anyio
+    async def test_user_agent_mismatch_is_rejected(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """A server gating on the app name rejects a mismatched User-Agent."""
+        approved = "RepeaterBook Python Client"
+
+        async def handler(request: web.Request) -> web.Response:
+            if not request.headers.get("User-Agent", "").startswith(approved):
+                return web.json_response({"error_code": "ua_mismatch"}, status=401)
+            return web.json_response({"count": 0, "results": []})
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(
+                app_token="rbuapp_test",
+                app_name="not-the-approved-app",
+                working_dir=Path(tmp_path),
+            )
+            with pytest.raises(RepeaterBookUnauthorizedError):
+                await api.export_json(url)
