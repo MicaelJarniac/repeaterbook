@@ -52,19 +52,27 @@ To install the latest development version:
 
 ## Quick Start
 
+!!! note "You need an API token"
+    As of RepeaterBook's [2026-03-03 API policy](https://repeaterbook.com/wiki/doku.php?id=api), the API requires an approved per-user token (an `rbuapp_...` token). Generate one from your RepeaterBook account and expose it as the `REPEATERBOOK` environment variable. See the [Authentication guide](usage.md#authentication), and never share or distribute your token.
+
+```bash
+export REPEATERBOOK="rbuapp_your_token_here"
+```
+
 ### 1. Download Repeater Data
 
 First, let's download repeater data for a specific region. RepeaterBook.com provides data for different countries and states.
 
 ```python
 import asyncio
+import os
 from repeaterbook.services import RepeaterBookAPI
 from repeaterbook.models import ExportQuery
 import pycountry
 
 async def download_repeaters():
     # Create an API client
-    api = RepeaterBookAPI()
+    api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
 
     # Download repeaters for Brazil
     brazil = pycountry.countries.get(name="Brazil")
@@ -181,6 +189,7 @@ Here's a complete example that ties everything together:
 
 ```python
 import asyncio
+import os
 from repeaterbook import RepeaterBook, Repeater
 from repeaterbook.services import RepeaterBookAPI
 from repeaterbook.models import ExportQuery, Status, Use
@@ -190,7 +199,7 @@ import pycountry
 
 async def main():
     # 1. Download repeater data
-    api = RepeaterBookAPI()
+    api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
     brazil = pycountry.countries.get(name="Brazil")
 
     print("Downloading repeaters...")
