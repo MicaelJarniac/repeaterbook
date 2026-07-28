@@ -12,6 +12,7 @@ __all__: tuple[str, ...] = (
 )
 
 import asyncio
+import email.utils
 import hashlib
 import json
 import time
@@ -19,7 +20,7 @@ from contextlib import suppress
 from datetime import date, timedelta
 from decimal import Decimal
 from http import HTTPStatus
-from typing import Any, Final, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Final, NotRequired, TypedDict, cast
 
 import aiohttp
 import attrs
@@ -30,13 +31,14 @@ from yarl import URL
 
 from repeaterbook.exceptions import (
     RepeaterBookAPIError,
+    RepeaterBookForbiddenError,
+    RepeaterBookRateLimitError,
     RepeaterBookUnauthorizedError,
     RepeaterBookValidationError,
 )
 from repeaterbook.models import (
     Emergency,
     EmergencyJSON,
-    ExportErrorJSON,
     ExportJSON,
     ExportNorthAmericaQuery,
     ExportQuery,
@@ -51,14 +53,8 @@ from repeaterbook.models import (
     Use,
 )
 
-
-class APIError(Exception):
-    """Generic API error for non-200 responses."""
-
-    def __init__(self, status: int, message: str | None = None) -> None:
-        self.status = status
-        self.message = message or f"API returned status code {status}"
-        super().__init__(self.message)
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 IdentityHeaders = TypedDict(
@@ -68,6 +64,79 @@ IdentityHeaders = TypedDict(
         "X-RB-App-Token": NotRequired[str],
     },
 )
+
+
+def _parse_api_error(body_text: str) -> tuple[str | None, str | None]:
+    """Parse an API error code and message from a response body."""
+    try:
+        data = json.loads(body_text)
+    except json.JSONDecodeError:
+        return None, body_text.strip() or None
+    if not isinstance(data, dict):
+        return None, body_text.strip() or None
+    error_code = data.get("error_code")
+    message = data.get("message")
+    return (
+        error_code if isinstance(error_code, str) else None,
+        message if isinstance(message, str) else None,
+    )
+
+
+def _parse_retry_after(headers: Mapping[str, str]) -> float | None:
+    """Parse a Retry-After header as a delay in seconds."""
+    value = headers.get("Retry-After")
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        parsed = email.utils.parsedate_tz(value)
+        if parsed is None:
+            return None
+        return max(0.0, email.utils.mktime_tz(parsed) - time.time())
+
+
+def _error_for(
+    status: int,
+    body_text: str,
+    url: URL,
+    headers: Mapping[str, str],
+) -> RepeaterBookAPIError:
+    """Build the structured exception corresponding to an HTTP error response."""
+    error_code, message = _parse_api_error(body_text)
+    msg = message or f"HTTP {status}"
+    if status == HTTPStatus.UNAUTHORIZED:
+        return RepeaterBookUnauthorizedError(
+            msg,
+            status_code=status,
+            error_code=error_code,
+            url=str(url),
+            body=body_text,
+        )
+    if status == HTTPStatus.FORBIDDEN:
+        return RepeaterBookForbiddenError(
+            msg,
+            status_code=status,
+            error_code=error_code,
+            url=str(url),
+            body=body_text,
+        )
+    if status == HTTPStatus.TOO_MANY_REQUESTS:
+        return RepeaterBookRateLimitError(
+            msg,
+            status_code=status,
+            error_code=error_code,
+            url=str(url),
+            body=body_text,
+            retry_after=_parse_retry_after(headers),
+        )
+    return RepeaterBookAPIError(
+        msg,
+        status_code=status,
+        error_code=error_code,
+        url=str(url),
+        body=body_text,
+    )
 
 
 async def fetch_json(
@@ -108,10 +177,9 @@ async def fetch_json(
         ) as session,
         session.get(url) as response,
     ):
-        try:
-            response.raise_for_status()
-        except aiohttp.ClientResponseError as e:
-            raise APIError(status=response.status, message=str(e)) from e
+        if response.status >= HTTPStatus.BAD_REQUEST:
+            body_text = await response.text()
+            raise _error_for(response.status, body_text, url, response.headers)
         # Write to temp file first for atomic cache updates.
         async with await temp_file.open("wb") as f:
             with tqdm(
@@ -447,43 +515,49 @@ class RepeaterBookAPI:
 
     async def export_json(self, url: URL) -> ExportJSON:
         """Export data for given URL."""
-        try:
-            data: ExportJSON | ExportErrorJSON | Any = await fetch_json(
-                url,
-                headers=self.headers,
-                cache_dir=await self.cache_dir(),
-                max_cache_age=self.max_cache_age,
-            )
-        except APIError as e:
-            msg = f"API request failed for {url}"
-            if e.status == HTTPStatus.UNAUTHORIZED:
-                raise RepeaterBookUnauthorizedError(msg) from e
-            raise RepeaterBookAPIError(msg) from e
+        data: Any = await fetch_json(
+            url,
+            headers=self.headers,
+            cache_dir=await self.cache_dir(),
+            max_cache_age=self.max_cache_age,
+        )
 
         if not isinstance(data, dict):
             msg = f"Expected dict response from API, got {type(data).__name__}"
             raise RepeaterBookValidationError(msg)
 
-        data = cast("ExportErrorJSON | ExportJSON", data)
+        data = cast("dict[str, Any]", data)
 
-        if data.get("status") == "error":
-            raise RepeaterBookAPIError(data.get("message", "Unknown API error"))
+        if (
+            data.get("status") == "error"
+            or data.get("ok") is False
+            or data.get("error_code")
+        ):
+            message = data.get("message")
+            error_code = data.get("error_code")
+            raise RepeaterBookAPIError(
+                message if isinstance(message, str) else "Unknown API error",
+                status_code=HTTPStatus.OK,
+                error_code=error_code if isinstance(error_code, str) else None,
+                url=str(url),
+                body=data,
+            )
 
         if "count" not in data or "results" not in data:
             msg = "API response missing required 'count' or 'results' field"
             raise RepeaterBookValidationError(msg)
 
-        data = cast("ExportJSON", data)
+        export = cast("ExportJSON", data)
 
-        if data["count"] >= self.max_count:
+        if export["count"] >= self.max_count:
             logger.warning(
                 "Reached max count for API response. Response may have been trimmed."
             )
 
-        if data["count"] != len(data["results"]):
+        if export["count"] != len(export["results"]):
             logger.warning("Mismatched count and length of results.")
 
-        return data
+        return export
 
     async def export_multi_json(self, urls: set[URL]) -> list[ExportJSON]:
         """Export data for given URLs."""
