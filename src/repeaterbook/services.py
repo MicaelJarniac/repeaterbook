@@ -66,7 +66,7 @@ IdentityHeaders = TypedDict(
     "IdentityHeaders",
     {
         "User-Agent": str,
-        "Authorization": NotRequired[str],
+        "X-RB-App-Token": NotRequired[str],
     },
 )
 
@@ -271,7 +271,9 @@ class RepeaterBookAPI:
         app_name: Application name for User-Agent header.
         app_version: Application version for User-Agent header.
         app_contact: Contact information for User-Agent header.
-        app_token: Optional API token for Authorization header.
+        app_token: Optional per-user RepeaterBook API token, sent via the
+            X-RB-App-Token header. Live exports require an approved
+            rbuapp_ token as of RepeaterBook's 2026-03-03 API policy.
         working_dir: Directory for cache and database files.
         max_cache_age: Maximum age of cached API responses before refresh.
             Defaults to 1 hour.
@@ -283,7 +285,7 @@ class RepeaterBookAPI:
     app_name: str = "RepeaterBook Python Client"
     app_version: str = __version__
     app_contact: str = "micael@jarniac.dev"
-    app_token: str | None = None
+    app_token: str | None = attrs.field(default=None, repr=False)
 
     working_dir: Path = attrs.Factory(Path)
 
@@ -309,7 +311,7 @@ class RepeaterBookAPI:
             "User-Agent": f"{self.app_name}/{self.app_version} (+{self.app_contact})",
         }
         if self.app_token:
-            headers["Authorization"] = f"Bearer {self.app_token}"
+            headers["X-RB-App-Token"] = self.app_token
         return headers
 
     @property

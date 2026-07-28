@@ -13,6 +13,7 @@ from yarl import URL
 
 from repeaterbook.exceptions import (
     RepeaterBookAPIError,
+    RepeaterBookUnauthorizedError,
     RepeaterBookValidationError,
 )
 from repeaterbook.models import (
@@ -415,3 +416,73 @@ class TestRepeaterBookAPIExport:
             result = await api.export_json(url)
             assert result["count"] == 1
             assert len(result["results"]) == 1
+
+
+class TestRepeaterBookAPIAuth:
+    """Tests for RepeaterBookAPI authentication headers."""
+
+    def test_headers_without_token_omit_auth(self) -> None:
+        """Without a token, no authentication header is sent."""
+        headers = dict(RepeaterBookAPI().headers)
+        assert "User-Agent" in headers
+        assert "X-RB-App-Token" not in headers
+        assert "Authorization" not in headers
+
+    def test_headers_with_token_use_x_rb_app_token(self) -> None:
+        """With a token, the raw token is sent via the X-RB-App-Token header."""
+        headers = dict(RepeaterBookAPI(app_token="rbuapp_test").headers)
+        assert headers["X-RB-App-Token"] == "rbuapp_test"
+        assert "Authorization" not in headers
+
+    @pytest.mark.anyio
+    async def test_auth_header_reaches_server(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """The X-RB-App-Token header should reach the server with the raw token."""
+        captured: dict[str, str | None] = {}
+
+        async def handler(request: web.Request) -> web.Response:
+            captured["X-RB-App-Token"] = request.headers.get("X-RB-App-Token")
+            captured["Authorization"] = request.headers.get("Authorization")
+            return web.json_response({"count": 0, "results": []})
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(app_token="rbuapp_test", working_dir=Path(tmp_path))
+            await api.export_json(url)
+
+        assert captured["X-RB-App-Token"] == "rbuapp_test"
+        assert captured["Authorization"] is None
+
+    @pytest.mark.anyio
+    async def test_export_json_raises_unauthorized_on_401(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """export_json should raise RepeaterBookUnauthorizedError on HTTP 401."""
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response({"error_code": "auth_missing"}, status=401)
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookUnauthorizedError):
+                await api.export_json(url)
+
+    @pytest.mark.anyio
+    async def test_export_json_raises_api_error_on_500(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """export_json should raise RepeaterBookAPIError on other HTTP errors."""
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response({"error": "boom"}, status=500)
+
+        async with local_server(handler) as url:
+            api = RepeaterBookAPI(working_dir=Path(tmp_path))
+            with pytest.raises(RepeaterBookAPIError):
+                await api.export_json(url)

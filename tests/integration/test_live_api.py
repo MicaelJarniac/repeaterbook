@@ -4,7 +4,7 @@ These hit repeaterbook.com over the network, so they are disabled by default.
 
 Enable with:
 
-  REPEATERBOOK_LIVE=1 uv run pytest -q -m integration
+  REPEATERBOOK_LIVE=1 REPEATERBOOK=<rbuapp_token> uv run pytest -q -m integration
 """
 
 from __future__ import annotations
@@ -37,21 +37,29 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.mark.integration
-@pytest.mark.anyio
-async def test_live_export_row_brazil_downloads_and_parses(
-    tmp_path: StdPath,
-) -> None:
-    """Brazil repeaters download and parse correctly from ROW endpoint."""
-    api = RepeaterBookAPI(
+@pytest.fixture
+def live_api(tmp_path: StdPath) -> RepeaterBookAPI:
+    """Authenticated live API client, skipped when no token is configured."""
+    token = os.environ.get("REPEATERBOOK")
+    if not token:
+        pytest.skip("Set REPEATERBOOK=<token> to run live integration tests")
+    return RepeaterBookAPI(
+        app_token=token,
         app_name="repeaterbook-live-test",
         app_contact="micael@jarniac.dev",
         working_dir=Path(tmp_path),
     )
 
+
+@pytest.mark.integration
+@pytest.mark.anyio
+async def test_live_export_row_brazil_downloads_and_parses(
+    live_api: RepeaterBookAPI,
+) -> None:
+    """Brazil repeaters download and parse correctly from ROW endpoint."""
     # Brazil is served by ROW endpoint.
     q = ExportQuery(countries=frozenset({pycountry.countries.lookup("Brazil")}))
-    reps = await api.download(q)
+    reps = await live_api.download(q)
 
     assert len(reps) > 0
     assert all(r.country for r in reps)
@@ -60,24 +68,18 @@ async def test_live_export_row_brazil_downloads_and_parses(
 @pytest.mark.integration
 @pytest.mark.anyio
 async def test_live_export_north_america_payload_parses_first_rows(
-    tmp_path: StdPath,
+    live_api: RepeaterBookAPI,
 ) -> None:
     """NA payload shape differs; ensure json_to_model handles it.
 
     We don't route NA through urls_export() yet, so we call export.php directly.
     """
-    api = RepeaterBookAPI(
-        app_name="repeaterbook-live-test",
-        app_contact="micael@jarniac.dev",
-        working_dir=Path(tmp_path),
-    )
-
     url = URL("https://repeaterbook.com/api/export.php") % {
         "state_id": "06",  # California
         "country": "United States",
     }
 
-    payload = await api.export_json(url)
+    payload = await live_api.export_json(url)
     assert payload["count"] == len(payload["results"])
     assert payload["count"] > 0
 
@@ -92,17 +94,11 @@ async def test_live_export_north_america_payload_parses_first_rows(
 
 @pytest.mark.integration
 @pytest.mark.anyio
-async def test_smart_routing_na_only_via_state_id(tmp_path: StdPath) -> None:
+async def test_smart_routing_na_only_via_state_id(live_api: RepeaterBookAPI) -> None:
     """Query with state_id routes only to NA endpoint."""
-    api = RepeaterBookAPI(
-        app_name="repeaterbook-live-test",
-        app_contact="micael@jarniac.dev",
-        working_dir=Path(tmp_path),
-    )
-
     # state_id is NA-specific, so only NA endpoint should be queried
     q = ExportQuery(state_ids=frozenset({"06"}))  # California
-    urls = api.urls_export(q)
+    urls = live_api.urls_export(q)
 
     assert len(urls) == 1
     url_str = str(next(iter(urls)))
@@ -111,7 +107,7 @@ async def test_smart_routing_na_only_via_state_id(tmp_path: StdPath) -> None:
     assert "state_id=06" in url_str
 
     # Verify it actually works
-    reps = await api.download(q)
+    reps = await live_api.download(q)
     assert len(reps) > 0
     # All results should be from California
     assert all(r.state_id == "06" for r in reps)
@@ -119,17 +115,11 @@ async def test_smart_routing_na_only_via_state_id(tmp_path: StdPath) -> None:
 
 @pytest.mark.integration
 @pytest.mark.anyio
-async def test_smart_routing_row_only_via_region(tmp_path: StdPath) -> None:
+async def test_smart_routing_row_only_via_region(live_api: RepeaterBookAPI) -> None:
     """Query with region routes only to ROW endpoint."""
-    api = RepeaterBookAPI(
-        app_name="repeaterbook-live-test",
-        app_contact="micael@jarniac.dev",
-        working_dir=Path(tmp_path),
-    )
-
     # region is ROW-specific, so only ROW endpoint should be queried
     q = ExportQuery(regions=frozenset({"South America"}))
-    urls = api.urls_export(q)
+    urls = live_api.urls_export(q)
 
     assert len(urls) == 1
     url_str = str(next(iter(urls)))
@@ -138,26 +128,20 @@ async def test_smart_routing_row_only_via_region(tmp_path: StdPath) -> None:
     assert "South+America" in url_str
 
     # Verify it actually works
-    reps = await api.download(q)
+    reps = await live_api.download(q)
     assert len(reps) > 0
 
 
 @pytest.mark.integration
 @pytest.mark.anyio
-async def test_smart_routing_na_country_only(tmp_path: StdPath) -> None:
+async def test_smart_routing_na_country_only(live_api: RepeaterBookAPI) -> None:
     """Query with NA country routes only to NA endpoint."""
-    api = RepeaterBookAPI(
-        app_name="repeaterbook-live-test",
-        app_contact="micael@jarniac.dev",
-        working_dir=Path(tmp_path),
-    )
-
     us = pycountry.countries.lookup("United States")
     q = ExportQuery(
         countries=frozenset({us}),
         state_ids=frozenset({"48"}),  # Texas - smaller result set
     )
-    urls = api.urls_export(q)
+    urls = live_api.urls_export(q)
 
     assert len(urls) == 1
     url_str = str(next(iter(urls)))
@@ -167,41 +151,31 @@ async def test_smart_routing_na_country_only(tmp_path: StdPath) -> None:
 
 @pytest.mark.integration
 @pytest.mark.anyio
-async def test_smart_routing_row_country_only(tmp_path: StdPath) -> None:
+async def test_smart_routing_row_country_only(live_api: RepeaterBookAPI) -> None:
     """Query with ROW country routes only to ROW endpoint."""
-    api = RepeaterBookAPI(
-        app_name="repeaterbook-live-test",
-        app_contact="micael@jarniac.dev",
-        working_dir=Path(tmp_path),
-    )
-
     germany = pycountry.countries.lookup("Germany")
     q = ExportQuery(countries=frozenset({germany}))
-    urls = api.urls_export(q)
+    urls = live_api.urls_export(q)
 
     assert len(urls) == 1
     url_str = str(next(iter(urls)))
     assert "exportROW.php" in url_str
 
     # Verify it actually works
-    reps = await api.download(q)
+    reps = await live_api.download(q)
     assert len(reps) > 0
 
 
 @pytest.mark.integration
 @pytest.mark.anyio
-async def test_smart_routing_mixed_countries_both_endpoints(tmp_path: StdPath) -> None:
+async def test_smart_routing_mixed_countries_both_endpoints(
+    live_api: RepeaterBookAPI,
+) -> None:
     """Query with both NA and ROW countries routes to both endpoints."""
-    api = RepeaterBookAPI(
-        app_name="repeaterbook-live-test",
-        app_contact="micael@jarniac.dev",
-        working_dir=Path(tmp_path),
-    )
-
     us = pycountry.countries.lookup("United States")
     germany = pycountry.countries.lookup("Germany")
     q = ExportQuery(countries=frozenset({us, germany}))
-    urls = api.urls_export(q)
+    urls = live_api.urls_export(q)
 
     # Should route to both endpoints
     assert len(urls) == 2
@@ -212,16 +186,12 @@ async def test_smart_routing_mixed_countries_both_endpoints(tmp_path: StdPath) -
 
 @pytest.mark.integration
 @pytest.mark.anyio
-async def test_smart_routing_empty_query_both_endpoints(tmp_path: StdPath) -> None:
+async def test_smart_routing_empty_query_both_endpoints(
+    live_api: RepeaterBookAPI,
+) -> None:
     """Empty query routes to both endpoints."""
-    api = RepeaterBookAPI(
-        app_name="repeaterbook-live-test",
-        app_contact="micael@jarniac.dev",
-        working_dir=Path(tmp_path),
-    )
-
     q = ExportQuery()  # Empty query
-    urls = api.urls_export(q)
+    urls = live_api.urls_export(q)
 
     # Should query both endpoints
     assert len(urls) == 2
@@ -232,17 +202,13 @@ async def test_smart_routing_empty_query_both_endpoints(tmp_path: StdPath) -> No
 
 @pytest.mark.integration
 @pytest.mark.anyio
-async def test_smart_routing_mode_filter_both_endpoints(tmp_path: StdPath) -> None:
+async def test_smart_routing_mode_filter_both_endpoints(
+    live_api: RepeaterBookAPI,
+) -> None:
     """Query with only mode (common filter) routes to both endpoints."""
-    api = RepeaterBookAPI(
-        app_name="repeaterbook-live-test",
-        app_contact="micael@jarniac.dev",
-        working_dir=Path(tmp_path),
-    )
-
     # Mode is a common filter, not NA or ROW-specific
     q = ExportQuery(modes=frozenset({Mode.DMR}))
-    urls = api.urls_export(q)
+    urls = live_api.urls_export(q)
 
     # Should query both endpoints since mode is common
     assert len(urls) == 2
