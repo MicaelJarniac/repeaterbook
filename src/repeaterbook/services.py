@@ -28,7 +28,6 @@ from loguru import logger
 from tqdm import tqdm
 from yarl import URL
 
-from repeaterbook import __version__
 from repeaterbook.exceptions import (
     RepeaterBookAPIError,
     RepeaterBookUnauthorizedError,
@@ -283,7 +282,12 @@ class RepeaterBookAPI:
 
     base_url: URL = attrs.Factory(lambda: URL("https://repeaterbook.com"))
     app_name: str = "RepeaterBook Python Client"
-    app_version: str = __version__
+    # Hard-coded rather than the package __version__: RepeaterBook approves API
+    # tokens against a specific User-Agent (including the version), so deriving
+    # this from the installed package would change the UA on every release and
+    # break already-approved tokens. Bump it deliberately, only in lockstep with
+    # the User-Agent registered with RepeaterBook.
+    app_version: str = "0.6.0"
     app_contact: str = "micael@jarniac.dev"
     app_token: str | None = attrs.field(default=None, repr=False)
 
