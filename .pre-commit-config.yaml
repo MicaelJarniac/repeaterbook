@@ -15,6 +15,6 @@ repos:
         name: regenerate RepeaterSpec JSON schema
         entry: repeaterbook-write-schema
         language: system
-        files: ^src/repeaterbook/mcp/(models\.py|schemas/repeater_spec\.schema\.json)$
+        files: ^src/repeaterbook/(spec\.py|schemas/repeater_spec\.schema\.json)$
         pass_filenames: false
         stages: [pre-commit]
