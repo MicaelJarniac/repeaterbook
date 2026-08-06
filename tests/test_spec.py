@@ -105,7 +105,15 @@ def test_extra_key_on_params_is_rejected() -> None:
 
 
 def test_schema_rejects_mode_params_mismatch() -> None:
-    """The published JSON Schema should reject a mode/params mismatch."""
+    """The published JSON Schema should reject a mode/params mismatch.
+
+    `mode` at the root is required (it's a `readOnly` computed field, but
+    `readOnly` does not exempt a key from `required` in JSON Schema), so it
+    must still be present here or validation fails at the root before the
+    params union is ever consulted. Asserting the error's `absolute_path`
+    is `["params"]` pins the rejection to the union discriminator doing its
+    job, not to a missing top-level key.
+    """
     schema = repeater_spec_json_schema()
     bad = {
         "name": "x", "callsign": None,
@@ -114,10 +122,12 @@ def test_schema_rejects_mode_params_mismatch() -> None:
         "latitude": "-27.4", "longitude": "153.0", "distance_km": None,
         "operational_status": "ON_AIR", "use": "OPEN", "band": "M_2",
         "notes": None, "last_update": "2026-01-01", "source_id": "QLD:1",
+        "mode": "FM",
         "params": {"mode": "FM", "color_code": "1"},  # FM can't have a color code
     }
-    with pytest.raises(jsonschema.ValidationError):
+    with pytest.raises(jsonschema.ValidationError) as excinfo:
         jsonschema.validate(bad, schema)
+    assert list(excinfo.value.absolute_path) == ["params"]
 
 
 def test_committed_schema_matches_model() -> None:
