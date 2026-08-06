@@ -1,33 +1,27 @@
 """Neutral, source-agnostic repeater-spec contract and its mapper.
 
 One RepeaterSpec is one programmable radio channel. A multi-mode repeater
-expands to one spec per mode. `mode` discriminates a union whose `params`
-object carries exactly that mode's parameters; `extra="forbid"` on each
-params model is what makes a mode/params mismatch illegal by construction.
+expands to one spec per mode. `params` is a union discriminated on its own
+`mode` field, and `extra="forbid"` on each params model is what makes a
+mode/params mismatch illegal by construction. `RepeaterSpec.mode` re-exposes
+`params.mode` at the top level, so the two can never disagree.
 """
 
 from __future__ import annotations
 
 __all__: tuple[str, ...] = (
     "DStarParams",
-    "DStarSpec",
     "DmrParams",
-    "DmrSpec",
     "FmParams",
-    "FmSpec",
     "FusionParams",
-    "FusionSpec",
     "M17Params",
-    "M17Spec",
     "NxdnParams",
-    "NxdnSpec",
     "P25Params",
-    "P25Spec",
+    "Params",
     "RepeaterMode",
     "RepeaterSpec",
     "StatusName",
     "TetraParams",
-    "TetraSpec",
     "UseName",
     "freq_to_band",
     "parse_tone",
@@ -44,7 +38,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, computed_field
 
 if TYPE_CHECKING:
     from repeaterbook.models import Repeater
@@ -77,10 +71,12 @@ class _Params(BaseModel):
 
 
 class FmParams(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.FM] = RepeaterMode.FM
     bandwidth_khz: Decimal | None = None
 
 
 class DmrParams(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.DMR] = RepeaterMode.DMR
     dmr_id: str | None = None
     color_code: str | None = None
 
@@ -88,32 +84,54 @@ class DmrParams(_Params):  # noqa: D101 -- docstring would leak into the committ
 class DStarParams(_Params):
     """RepeaterBook carries no D-STAR parameters; intentionally empty."""
 
+    mode: Literal[RepeaterMode.DSTAR] = RepeaterMode.DSTAR
+
 
 class FusionParams(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.FUSION] = RepeaterMode.FUSION
     digital_id_uplink: str | None = None
     digital_id_downlink: str | None = None
     dsc: str | None = None
 
 
 class P25Params(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.P25] = RepeaterMode.P25
     nac: str | None = None
 
 
 class NxdnParams(_Params):
     """RepeaterBook carries no NXDN parameters; intentionally empty."""
 
+    mode: Literal[RepeaterMode.NXDN] = RepeaterMode.NXDN
+
 
 class TetraParams(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.TETRA] = RepeaterMode.TETRA
     mcc: str | None = None
     mnc: str | None = None
 
 
 class M17Params(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.M17] = RepeaterMode.M17
     can: str | None = None
 
 
-class _BaseSpec(BaseModel):
-    """Fields common to every mode."""
+_ParamsUnion: TypeAlias = (
+    FmParams
+    | DmrParams
+    | DStarParams
+    | FusionParams
+    | P25Params
+    | NxdnParams
+    | TetraParams
+    | M17Params
+)
+
+Params: TypeAlias = Annotated[_ParamsUnion, Field(discriminator="mode")]
+
+
+class RepeaterSpec(BaseModel):
+    """One programmable radio channel; `params` is discriminated on its mode."""
 
     name: str
     callsign: str | None
@@ -132,71 +150,27 @@ class _BaseSpec(BaseModel):
     last_update: date
     source: str = "repeaterbook"
     source_id: str
+    params: Params
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def mode(self) -> RepeaterMode:
+        """The channel's mode, derived from `params` so the two cannot disagree."""
+        return self.params.mode
 
-# Spec subclasses intentionally have no docstrings: BaseModel puts a class's
-# docstring into the JSON Schema "description" for that $def, and the schema
-# is a committed, drift-checked artifact (test_committed_schema_matches_model).
-
-
-class FmSpec(_BaseSpec):  # noqa: D101
-    mode: Literal[RepeaterMode.FM] = RepeaterMode.FM
-    params: FmParams = FmParams()
-
-
-class DmrSpec(_BaseSpec):  # noqa: D101
-    mode: Literal[RepeaterMode.DMR] = RepeaterMode.DMR
-    params: DmrParams = DmrParams()
-
-
-class DStarSpec(_BaseSpec):  # noqa: D101
-    mode: Literal[RepeaterMode.DSTAR] = RepeaterMode.DSTAR
-    params: DStarParams = DStarParams()
-
-
-class FusionSpec(_BaseSpec):  # noqa: D101
-    mode: Literal[RepeaterMode.FUSION] = RepeaterMode.FUSION
-    params: FusionParams = FusionParams()
-
-
-class P25Spec(_BaseSpec):  # noqa: D101
-    mode: Literal[RepeaterMode.P25] = RepeaterMode.P25
-    params: P25Params = P25Params()
-
-
-class NxdnSpec(_BaseSpec):  # noqa: D101
-    mode: Literal[RepeaterMode.NXDN] = RepeaterMode.NXDN
-    params: NxdnParams = NxdnParams()
-
-
-class TetraSpec(_BaseSpec):  # noqa: D101
-    mode: Literal[RepeaterMode.TETRA] = RepeaterMode.TETRA
-    params: TetraParams = TetraParams()
-
-
-class M17Spec(_BaseSpec):  # noqa: D101
-    mode: Literal[RepeaterMode.M17] = RepeaterMode.M17
-    params: M17Params = M17Params()
-
-
-RepeaterSpec: TypeAlias = Annotated[
-    FmSpec
-    | DmrSpec
-    | DStarSpec
-    | FusionSpec
-    | P25Spec
-    | NxdnSpec
-    | TetraSpec
-    | M17Spec,
-    Field(discriminator="mode"),
-]
 
 _ADAPTER: TypeAdapter[RepeaterSpec] = TypeAdapter(RepeaterSpec)
 
 
 def repeater_spec_json_schema() -> dict[str, object]:
-    """Return the JSON Schema for the RepeaterSpec union."""
-    return _ADAPTER.json_schema()
+    """Return the JSON Schema for RepeaterSpec, as it appears on the wire.
+
+    Generated in serialization mode on purpose: `mode` is a computed field, and
+    Pydantic emits computed fields only into the serialization schema. The
+    default validation mode would publish a contract missing the top-level
+    `mode` key that this model actually serializes.
+    """
+    return _ADAPTER.json_schema(mode="serialization")
 
 
 def schema_path() -> Path:
@@ -246,16 +220,30 @@ def freq_to_band(freq: Decimal) -> str | None:
     return None
 
 
-# Maps a mode to (Spec subclass, Repeater accessor attribute).
-_MODE_DISPATCH: dict[RepeaterMode, tuple[type[_BaseSpec], str]] = {
-    RepeaterMode.FM: (FmSpec, "fm"),
-    RepeaterMode.DMR: (DmrSpec, "dmr"),
-    RepeaterMode.DSTAR: (DStarSpec, "dstar"),
-    RepeaterMode.FUSION: (FusionSpec, "fusion"),
-    RepeaterMode.P25: (P25Spec, "p25"),
-    RepeaterMode.NXDN: (NxdnSpec, "nxdn"),
-    RepeaterMode.TETRA: (TetraSpec, "tetra"),
-    RepeaterMode.M17: (M17Spec, "m17"),
+# Maps a mode to the Repeater accessor returning that mode's params.
+_ACCESSOR: dict[RepeaterMode, str] = {
+    RepeaterMode.FM: "fm",
+    RepeaterMode.DMR: "dmr",
+    RepeaterMode.DSTAR: "dstar",
+    RepeaterMode.FUSION: "fusion",
+    RepeaterMode.P25: "p25",
+    RepeaterMode.NXDN: "nxdn",
+    RepeaterMode.TETRA: "tetra",
+    RepeaterMode.M17: "m17",
+}
+
+# Fallback params per mode. `mode` is derived from `params`, so falling back to a
+# single shared default (e.g. always FmParams) would silently relabel a channel's
+# mode instead of failing. Keep these mode-correct.
+_DEFAULT_PARAMS: dict[RepeaterMode, type[_ParamsUnion]] = {
+    RepeaterMode.FM: FmParams,
+    RepeaterMode.DMR: DmrParams,
+    RepeaterMode.DSTAR: DStarParams,
+    RepeaterMode.FUSION: FusionParams,
+    RepeaterMode.P25: P25Params,
+    RepeaterMode.NXDN: NxdnParams,
+    RepeaterMode.TETRA: TetraParams,
+    RepeaterMode.M17: M17Params,
 }
 
 
@@ -284,11 +272,11 @@ def repeater_to_specs(
         "last_update": rep.last_update,
         "source_id": f"{rep.state_id}:{rep.repeater_id}",
     }
-    modes = list(rep.modes) or [RepeaterMode.FM]
-    specs: list[RepeaterSpec] = []
-    for mode in modes:
-        spec_cls, accessor = _MODE_DISPATCH[mode]
-        params = getattr(rep, accessor) or spec_cls.model_fields["params"].default
-        spec_data = {**common, "mode": mode, "params": params}
-        specs.append(_ADAPTER.validate_python(spec_data))
-    return specs
+    modes = rep.modes or frozenset({RepeaterMode.FM})
+    return [
+        RepeaterSpec(
+            **common,  # type: ignore[arg-type]
+            params=getattr(rep, _ACCESSOR[mode]) or _DEFAULT_PARAMS[mode](),
+        )
+        for mode in modes
+    ]

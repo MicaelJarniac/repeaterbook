@@ -14,10 +14,9 @@ from pydantic import ValidationError
 from repeaterbook.models import Status, Use
 from repeaterbook.spec import (
     DmrParams,
-    DmrSpec,
     FmParams,
-    FmSpec,
     RepeaterMode,
+    RepeaterSpec,
     StatusName,
     UseName,
     freq_to_band,
@@ -46,8 +45,8 @@ def test_status_use_literals_match_enums() -> None:
 
 
 def test_fm_spec_defaults_and_wire_shape() -> None:
-    """FmSpec should default mode/source and serialize status/use as names."""
-    spec = FmSpec(
+    """RepeaterSpec should derive mode from params and serialize names, not ints."""
+    spec = RepeaterSpec(
         name="VK4RBN",
         callsign="VK4RBN",
         rx_frequency_mhz=Decimal("146.700"),
@@ -70,12 +69,13 @@ def test_fm_spec_defaults_and_wire_shape() -> None:
     assert payload["mode"] == "FM"
     assert payload["source"] == "repeaterbook"
     assert payload["operational_status"] == "ON_AIR"  # name, NOT an int
-    assert payload["params"] == {"bandwidth_khz": "25.0"}
+    # `mode` rides inside params too: it is the discriminator.
+    assert payload["params"] == {"mode": "FM", "bandwidth_khz": "25.0"}
 
 
 def test_dmr_spec_carries_color_code() -> None:
-    """DmrSpec should round-trip DMR-specific params."""
-    spec = DmrSpec(
+    """RepeaterSpec should round-trip DMR-specific params."""
+    spec = RepeaterSpec(
         name="VK4RDM",
         callsign="VK4RDM",
         rx_frequency_mhz=Decimal("439.000"),
@@ -95,6 +95,7 @@ def test_dmr_spec_carries_color_code() -> None:
         params=DmrParams(dmr_id="5051", color_code="1"),
     )
     assert spec.params.color_code == "1"
+    assert spec.mode is RepeaterMode.DMR
 
 
 def test_extra_key_on_params_is_rejected() -> None:
@@ -113,7 +114,7 @@ def test_schema_rejects_mode_params_mismatch() -> None:
         "latitude": "-27.4", "longitude": "153.0", "distance_km": None,
         "operational_status": "ON_AIR", "use": "OPEN", "band": "M_2",
         "notes": None, "last_update": "2026-01-01", "source_id": "QLD:1",
-        "mode": "FM", "params": {"color_code": "1"},  # FM can't have a color code
+        "params": {"mode": "FM", "color_code": "1"},  # FM can't have a color code
     }
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(bad, schema)
@@ -125,10 +126,6 @@ def test_committed_schema_matches_model() -> None:
     assert committed == repeater_spec_json_schema()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="root is a oneOf until the params-union refactor lands; Task 3 removes this",
-)
 def test_committed_schema_documents_wire_shape(
     sample_repeater: SampleRepeaterFactory,
 ) -> None:
@@ -191,8 +188,8 @@ def test_multi_mode_expansion_carries_per_mode_params(
     assert set(by_mode) == {RepeaterMode.FM, RepeaterMode.DMR}
     dmr = by_mode[RepeaterMode.DMR]
     fm = by_mode[RepeaterMode.FM]
-    assert isinstance(dmr, DmrSpec)
-    assert isinstance(fm, FmSpec)
+    assert isinstance(dmr.params, DmrParams)
+    assert isinstance(fm.params, FmParams)
     assert dmr.params.color_code == "1"
     assert fm.params.bandwidth_khz == Decimal("25.0")
 
