@@ -49,6 +49,7 @@ def test_fm_spec_defaults_and_wire_shape() -> None:
     spec = RepeaterSpec(
         name="VK4RBN",
         callsign="VK4RBN",
+        nearest_city="Brisbane",
         rx_frequency_mhz=Decimal("146.700"),
         tx_frequency_mhz=Decimal("146.100"),
         ctcss_tx_hz=Decimal("91.5"),
@@ -78,6 +79,7 @@ def test_dmr_spec_carries_color_code() -> None:
     spec = RepeaterSpec(
         name="VK4RDM",
         callsign="VK4RDM",
+        nearest_city="Brisbane",
         rx_frequency_mhz=Decimal("439.000"),
         tx_frequency_mhz=Decimal("434.000"),
         ctcss_tx_hz=None,
@@ -117,7 +119,7 @@ def test_schema_rejects_mode_params_mismatch() -> None:
     """
     schema = repeater_spec_json_schema()
     bad = {
-        "name": "x", "callsign": None,
+        "name": "x", "callsign": None, "nearest_city": "Brisbane",
         "rx_frequency_mhz": "146.7", "tx_frequency_mhz": "146.1",
         "ctcss_tx_hz": None, "ctcss_rx_hz": None, "dcs_code": None,
         "latitude": "-27.4", "longitude": "153.0", "distance_km": None,
@@ -172,6 +174,7 @@ def test_single_mode_expansion(sample_repeater: SampleRepeaterFactory) -> None:
     spec = specs[0]
     assert spec.mode is RepeaterMode.FM
     assert spec.name == "VK4RBN"
+    assert spec.nearest_city == "Brisbane"
     assert spec.rx_frequency_mhz == Decimal("146.700")
     assert spec.tx_frequency_mhz == Decimal("146.100")
     assert spec.ctcss_tx_hz == Decimal("91.5")

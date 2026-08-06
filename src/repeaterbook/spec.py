@@ -36,11 +36,13 @@ from datetime import date  # noqa: TC003
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, computed_field
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from repeaterbook.models import Repeater
 
 
@@ -135,6 +137,7 @@ class RepeaterSpec(BaseModel):
 
     name: str
     callsign: str | None
+    nearest_city: str
     rx_frequency_mhz: Decimal
     tx_frequency_mhz: Decimal
     ctcss_tx_hz: Decimal | None
@@ -220,16 +223,18 @@ def freq_to_band(freq: Decimal) -> str | None:
     return None
 
 
-# Maps a mode to the Repeater accessor returning that mode's params.
-_ACCESSOR: dict[RepeaterMode, str] = {
-    RepeaterMode.FM: "fm",
-    RepeaterMode.DMR: "dmr",
-    RepeaterMode.DSTAR: "dstar",
-    RepeaterMode.FUSION: "fusion",
-    RepeaterMode.P25: "p25",
-    RepeaterMode.NXDN: "nxdn",
-    RepeaterMode.TETRA: "tetra",
-    RepeaterMode.M17: "m17",
+# Maps a mode to the Repeater accessor returning that mode's params. Callables,
+# not attribute-name strings: mypy checks each accessor's return type and
+# rename-refactoring follows them.
+_ACCESSOR: dict[RepeaterMode, Callable[[Repeater], _ParamsUnion | None]] = {
+    RepeaterMode.FM: lambda r: r.fm,
+    RepeaterMode.DMR: lambda r: r.dmr,
+    RepeaterMode.DSTAR: lambda r: r.dstar,
+    RepeaterMode.FUSION: lambda r: r.fusion,
+    RepeaterMode.P25: lambda r: r.p25,
+    RepeaterMode.NXDN: lambda r: r.nxdn,
+    RepeaterMode.TETRA: lambda r: r.tetra,
+    RepeaterMode.M17: lambda r: r.m17,
 }
 
 # Fallback params per mode. `mode` is derived from `params`, so falling back to a
@@ -254,29 +259,30 @@ def repeater_to_specs(
     """Expand one repeater into one spec per supported mode."""
     ctcss_tx, dcs_tx = parse_tone(rep.pl_ctcss_uplink)
     ctcss_rx, dcs_rx = parse_tone(rep.pl_ctcss_tsq_downlink)
-    common: dict[str, object] = {
-        "name": rep.callsign or rep.location_nearest_city,
-        "callsign": rep.callsign,
-        "rx_frequency_mhz": rep.frequency,
-        "tx_frequency_mhz": rep.input_frequency,
-        "ctcss_tx_hz": ctcss_tx,
-        "ctcss_rx_hz": ctcss_rx,
-        "dcs_code": dcs_tx or dcs_rx,
-        "latitude": rep.latitude,
-        "longitude": rep.longitude,
-        "distance_km": distance_km,
-        "operational_status": rep.operational_status.name,
-        "use": rep.use_membership.name,
-        "band": freq_to_band(rep.frequency),
-        "notes": rep.notes,
-        "last_update": rep.last_update,
-        "source_id": f"{rep.state_id}:{rep.repeater_id}",
-    }
     modes = rep.modes or frozenset({RepeaterMode.FM})
+    # rep.operational_status.name / rep.use_membership.name are plain `str` to
+    # mypy; the casts to the narrower Literal aliases are safe because
+    # test_status_use_literals_match_enums guards them against enum drift.
     return [
         RepeaterSpec(
-            **common,  # type: ignore[arg-type]
-            params=getattr(rep, _ACCESSOR[mode]) or _DEFAULT_PARAMS[mode](),
+            name=rep.callsign or rep.location_nearest_city,
+            callsign=rep.callsign,
+            nearest_city=rep.location_nearest_city,
+            rx_frequency_mhz=rep.frequency,
+            tx_frequency_mhz=rep.input_frequency,
+            ctcss_tx_hz=ctcss_tx,
+            ctcss_rx_hz=ctcss_rx,
+            dcs_code=dcs_tx or dcs_rx,
+            latitude=rep.latitude,
+            longitude=rep.longitude,
+            distance_km=distance_km,
+            operational_status=cast("StatusName", rep.operational_status.name),
+            use=cast("UseName", rep.use_membership.name),
+            band=freq_to_band(rep.frequency),
+            notes=rep.notes,
+            last_update=rep.last_update,
+            source_id=f"{rep.state_id}:{rep.repeater_id}",
+            params=_ACCESSOR[mode](rep) or _DEFAULT_PARAMS[mode](),
         )
         for mode in modes
     ]

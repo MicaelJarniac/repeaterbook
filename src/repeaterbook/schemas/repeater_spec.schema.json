@@ -260,6 +260,10 @@
       ],
       "title": "Callsign"
     },
+    "nearest_city": {
+      "title": "Nearest City",
+      "type": "string"
+    },
     "rx_frequency_mhz": {
       "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
       "title": "Rx Frequency Mhz",
@@ -431,6 +435,7 @@
   "required": [
     "name",
     "callsign",
+    "nearest_city",
     "rx_frequency_mhz",
     "tx_frequency_mhz",
     "ctcss_tx_hz",
