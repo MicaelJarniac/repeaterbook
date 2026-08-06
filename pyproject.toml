@@ -46,6 +46,7 @@ issues = "https://github.com/MicaelJarniac/repeaterbook/issues"
 [project.optional-dependencies]
 mcp = [
     "fastmcp>=3.0.0",
+    "pydantic-settings>=2.0",
 ]
 
 [project.scripts]

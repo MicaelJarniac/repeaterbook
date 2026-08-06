@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 __all__: tuple[str, ...] = (
+    "RepeaterBookSettings",
     "get_repeater",
     "main",
     "mcp",
@@ -10,13 +11,15 @@ __all__: tuple[str, ...] = (
     "sync_repeaters",
 )
 
-import os
+import pathlib
 
 import attrs
 from anyio import Path
 from fastmcp import FastMCP
 from pycountry import countries
 from pycountry.db import Country  # noqa: TC002
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from repeaterbook.database import RepeaterBook
 from repeaterbook.exceptions import RepeaterBookUnauthorizedError
@@ -46,17 +49,34 @@ class _Context:
     db: RepeaterBook
 
 
+class RepeaterBookSettings(BaseSettings):
+    """MCP server configuration, read from ``REPEATERBOOK_*`` environment variables."""
+
+    model_config = SettingsConfigDict(env_prefix="REPEATERBOOK_")
+
+    working_dir: pathlib.Path = pathlib.Path()
+    app_contact: str = "unknown@example.com"
+    app_token: str | None = None
+
+    @field_validator("app_token")
+    @classmethod
+    def _empty_token_is_none(cls, value: str | None) -> str | None:
+        """Treat an empty-string token the same as an unset one."""
+        return value or None
+
+
 _context: _Context | None = None
 
 
 def _get_context() -> _Context:
     global _context  # noqa: PLW0603
     if _context is None:
-        working_dir = Path(os.environ.get("REPEATERBOOK_WORKING_DIR", "."))
-        contact = os.environ.get("REPEATERBOOK_APP_CONTACT", "unknown@example.com")
-        token = os.environ.get("REPEATERBOOK_APP_TOKEN") or None
+        settings = RepeaterBookSettings()
+        working_dir = Path(settings.working_dir)
         api = RepeaterBookAPI(
-            app_contact=contact, app_token=token, working_dir=working_dir
+            app_contact=settings.app_contact,
+            app_token=settings.app_token,
+            working_dir=working_dir,
         )
         db = RepeaterBook(working_dir=working_dir)
         db.init_db()
