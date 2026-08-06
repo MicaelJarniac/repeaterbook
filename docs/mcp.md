@@ -67,11 +67,12 @@ schema. The top-level copy is computed from `params.mode`, so the two are always
 consistent, and dict consumers can read `spec["mode"]` without descending into
 `params`.
 
-One consequence: because the top-level `mode` is `readOnly`, the published schema
-does not itself cross-check the two values, so a hand-written payload with
-contradictory `mode` and `params.mode` will validate. Payloads this library
-produces are consistent by construction, and payloads it parses ignore the
-top-level value and recompute it.
+One consequence: JSON Schema expresses no constraint tying the two `mode`
+values together, so the published schema does not cross-check them and a
+hand-written payload with contradictory `mode` and `params.mode` will
+validate. Payloads this library produces are consistent by construction,
+and payloads it parses ignore the top-level value and recompute it from
+`params.mode`.
 
 The schema is generated in Pydantic's **serialization** mode. `mode` is a
 computed field, and Pydantic emits computed fields only into the serialization

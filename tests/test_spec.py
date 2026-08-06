@@ -100,8 +100,9 @@ def test_dmr_spec_carries_color_code() -> None:
 
 def test_extra_key_on_params_is_rejected() -> None:
     """Params models forbid unknown keys, e.g. a color code on FmParams."""
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as excinfo:
         FmParams(color_code="1")  # type: ignore[call-arg]
+    assert excinfo.value.errors()[0]["type"] == "extra_forbidden"
 
 
 def test_schema_rejects_mode_params_mismatch() -> None:
@@ -210,6 +211,42 @@ def test_no_capability_defaults_to_fm(
     """A repeater with no capability flags set should default to FM."""
     specs = repeater_to_specs(sample_repeater(analog_capable=False))
     assert [s.mode for s in specs] == [RepeaterMode.FM]
+
+
+# Maps a mode to the Repeater capability flag that enables it. Flag names are
+# not derivable from the mode name (e.g. DSTAR -> d_star_capable, FUSION ->
+# yaesu_system_fusion_capable), so this has to be spelled out by hand; the
+# *set of modes under test* below does not, and comes straight from the enum.
+_MODE_FLAGS: dict[RepeaterMode, str] = {
+    RepeaterMode.FM: "analog_capable",
+    RepeaterMode.DMR: "dmr_capable",
+    RepeaterMode.DSTAR: "d_star_capable",
+    RepeaterMode.FUSION: "yaesu_system_fusion_capable",
+    RepeaterMode.P25: "apco_p_25_capable",
+    RepeaterMode.NXDN: "nxdn_capable",
+    RepeaterMode.TETRA: "tetra_capable",
+    RepeaterMode.M17: "m17_capable",
+}
+
+
+@pytest.mark.parametrize("mode", list(RepeaterMode))
+def test_repeater_to_specs_covers_every_mode(
+    sample_repeater: SampleRepeaterFactory, mode: RepeaterMode,
+) -> None:
+    """repeater_to_specs, `_ACCESSOR`, and `_DEFAULT_PARAMS` must cover every mode.
+
+    Parametrizing over `list(RepeaterMode)` (rather than a hand-written list of
+    the eight current mode names) means a ninth mode added to the enum shows up
+    here automatically -- as a failure, via the KeyError in `_MODE_FLAGS`, until
+    the mapper's tables are updated to match.
+    """
+    flags: dict[str, object] = {"analog_capable": False}
+    flags[_MODE_FLAGS[mode]] = True
+    specs = repeater_to_specs(sample_repeater(**flags))
+    assert len(specs) == 1
+    spec = specs[0]
+    assert spec.mode is mode
+    assert spec.mode is spec.params.mode
 
 
 def test_name_falls_back_to_city(sample_repeater: SampleRepeaterFactory) -> None:
