@@ -13,6 +13,8 @@ from pydantic import ValidationError
 
 from repeaterbook.models import Status, Use
 from repeaterbook.spec import (
+    _ACCESSOR,
+    _DEFAULT_PARAMS,
     DmrParams,
     FmParams,
     RepeaterMode,
@@ -250,6 +252,31 @@ def test_repeater_to_specs_covers_every_mode(
     spec = specs[0]
     assert spec.mode is mode
     assert spec.mode is spec.params.mode
+
+
+@pytest.mark.parametrize("mode", list(RepeaterMode))
+def test_accessor_and_default_params_agree_on_mode(
+    sample_repeater: SampleRepeaterFactory, mode: RepeaterMode,
+) -> None:
+    """`_ACCESSOR` and `_DEFAULT_PARAMS` must map every mode to the same params type.
+
+    Both tables are keyed by `RepeaterMode` independently, so nothing but a test
+    stops one from drifting from the other: a cross-wired accessor lambda (e.g.
+    `NXDN: lambda r: r.tetra`) type-checks fine since every accessor returns the
+    same `_ParamsUnion | None`, and a corrupted `_DEFAULT_PARAMS` entry is masked
+    by `or _DEFAULT_PARAMS[mode]()` whenever the accessor already returns a real
+    object. Parametrizing over `list(RepeaterMode)` means a ninth mode gets a
+    case automatically.
+    """
+    default = _DEFAULT_PARAMS[mode]()
+    assert default.mode is mode
+
+    flags: dict[str, object] = {"analog_capable": False}
+    flags[_MODE_FLAGS[mode]] = True
+    rep = sample_repeater(**flags)
+    result = _ACCESSOR[mode](rep)
+    assert result is not None
+    assert type(result) is _DEFAULT_PARAMS[mode]
 
 
 def test_name_falls_back_to_city(sample_repeater: SampleRepeaterFactory) -> None:
