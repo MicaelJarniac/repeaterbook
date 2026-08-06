@@ -46,6 +46,38 @@ Tools return **repeater-spec** rows — a neutral, source-agnostic shape carryin
 absolute rx/tx frequencies (the consuming radio derives duplex/offset). The JSON
 Schema is published at `repeaterbook/schemas/repeater_spec.schema.json`.
 
+### Spec wire shape
+
+Each spec is one programmable channel. Mode-specific fields live in `params`,
+which is a union discriminated on its own `mode` field:
+
+```json
+{
+  "name": "VK4RDM",
+  "rx_frequency_mhz": "439.000",
+  "tx_frequency_mhz": "434.000",
+  "mode": "DMR",
+  "params": { "mode": "DMR", "dmr_id": "5051", "color_code": "1" }
+}
+```
+
+`mode` appears twice by design. The copy inside `params` is the discriminator —
+it is what makes an FM channel carrying a DMR colour code invalid against the
+schema. The top-level copy is computed from `params.mode`, so the two are always
+consistent, and dict consumers can read `spec["mode"]` without descending into
+`params`.
+
+One consequence: because the top-level `mode` is `readOnly`, the published schema
+does not itself cross-check the two values, so a hand-written payload with
+contradictory `mode` and `params.mode` will validate. Payloads this library
+produces are consistent by construction, and payloads it parses ignore the
+top-level value and recompute it.
+
+The schema is generated in Pydantic's **serialization** mode. `mode` is a
+computed field, and Pydantic emits computed fields only into the serialization
+schema — the default validation mode would publish a contract missing a key that
+every response actually carries.
+
 ### Regenerating the schema
 
 The schema is generated from the `RepeaterSpec` model. After changing the model,
