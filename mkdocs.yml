@@ -120,7 +120,7 @@ nav:
   - Usage Guide: usage.md
   - Examples: examples.md
   - Architecture: architecture.md
-  - MCP server: mcp.md
+  - MCP Server: mcp.md
   - FAQ: faq.md
   - Contributing:
     - Guide: CONTRIBUTING.md
