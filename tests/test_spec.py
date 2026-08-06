@@ -125,6 +125,31 @@ def test_committed_schema_matches_model() -> None:
     assert committed == repeater_spec_json_schema()
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="root is a oneOf until the params-union refactor lands; Task 3 removes this",
+)
+def test_committed_schema_documents_wire_shape(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """The published schema must describe the payload the library actually emits.
+
+    Guards a Pydantic footgun: a `mode` exposed via @computed_field lands only in
+    the *serialization* schema, so generating the committed file in the default
+    validation mode would silently drop the top-level `mode` key that dict
+    consumers (e.g. the FTM-150 exporter) read.
+    """
+    committed = json.loads(schema_path().read_text(encoding="utf-8"))
+    assert "mode" in committed["properties"], (
+        "published schema lost its top-level `mode` property"
+    )
+
+    spec = repeater_to_specs(sample_repeater(), distance_km=5.0)[0]
+    wire = json.loads(spec.model_dump_json())
+    assert wire["mode"] == "FM"
+    jsonschema.validate(wire, committed)
+
+
 def test_freq_to_band() -> None:
     """freq_to_band should map known frequencies and reject unknown ones."""
     assert freq_to_band(Decimal("146.700")) == "M_2"
