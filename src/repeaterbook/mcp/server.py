@@ -54,9 +54,9 @@ class RepeaterBookSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="REPEATERBOOK_")
 
-    working_dir: pathlib.Path = pathlib.Path()
-    app_contact: str = "unknown@example.com"
-    app_token: str | None = None
+    working_dir: DirectoryPath = pathlib.Path()
+    app_contact: EmailStr = "unknown@example.com"
+    app_token: SecretStr | None = None
 
     @field_validator("app_token")
     @classmethod
