@@ -18,7 +18,7 @@ from anyio import Path
 from fastmcp import FastMCP
 from pycountry import countries
 from pycountry.db import Country  # noqa: TC002
-from pydantic import field_validator
+from pydantic import DirectoryPath, EmailStr, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from repeaterbook.database import RepeaterBook
@@ -60,7 +60,7 @@ class RepeaterBookSettings(BaseSettings):
 
     @field_validator("app_token")
     @classmethod
-    def _empty_token_is_none(cls, value: str | None) -> str | None:
+    def _empty_token_is_none(cls, value: SecretStr | None) -> SecretStr | None:
         """Treat an empty-string token the same as an unset one."""
         return value or None
 
@@ -75,7 +75,9 @@ def _get_context() -> _Context:
         working_dir = Path(settings.working_dir)
         api = RepeaterBookAPI(
             app_contact=settings.app_contact,
-            app_token=settings.app_token,
+            app_token=(
+                settings.app_token.get_secret_value() if settings.app_token else None
+            ),
             working_dir=working_dir,
         )
         db = RepeaterBook(working_dir=working_dir)

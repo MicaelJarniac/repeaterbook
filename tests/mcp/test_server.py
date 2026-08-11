@@ -77,3 +77,33 @@ async def test_search_without_scope_or_data_errors(
 
     with pytest.raises(ValueError, match="no local data"):
         await server.search_repeaters(lat=-27.47, lon=153.02, radius_km=40.0)
+
+
+def test_configured_token_reaches_auth_header_unmasked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test a configured token reaches the Authorization header unmasked."""
+    monkeypatch.setenv("REPEATERBOOK_WORKING_DIR", str(tmp_path))
+    monkeypatch.setenv("REPEATERBOOK_APP_CONTACT", "test@example.com")
+    monkeypatch.setenv("REPEATERBOOK_APP_TOKEN", "s3cret-token")
+    server._reset_context_for_tests()  # noqa: SLF001
+
+    headers = server._get_context().api.headers  # noqa: SLF001
+
+    assert headers["Authorization"] == "Bearer s3cret-token"
+
+
+def test_empty_token_sends_no_auth_header(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test an empty-string token is treated as unset, sending no auth header."""
+    monkeypatch.setenv("REPEATERBOOK_WORKING_DIR", str(tmp_path))
+    monkeypatch.setenv("REPEATERBOOK_APP_CONTACT", "test@example.com")
+    monkeypatch.setenv("REPEATERBOOK_APP_TOKEN", "")
+    server._reset_context_for_tests()  # noqa: SLF001
+
+    headers = server._get_context().api.headers  # noqa: SLF001
+
+    assert "Authorization" not in headers
