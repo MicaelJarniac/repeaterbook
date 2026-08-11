@@ -26,6 +26,7 @@ dependencies = [
     "haversine>=2.9.0",
     "loguru>=0.7.3",
     "pycountry>=24.6.1",
+    "pydantic>=2.0",
     "sqlmodel>=0.0.24",
     "tqdm>=4.67.1",
     "yarl>=1.18.3",
@@ -46,6 +47,7 @@ issues = "https://github.com/MicaelJarniac/repeaterbook/issues"
 [project.optional-dependencies]
 mcp = [
     "fastmcp>=3.0.0",
+    "pydantic[email]>=2.0",
     "pydantic-settings>=2.0",
 ]
 
