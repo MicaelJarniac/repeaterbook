@@ -15,6 +15,8 @@ repos:
         name: regenerate RepeaterSpec JSON schema
         entry: repeaterbook-write-schema
         language: system
-        files: ^src/repeaterbook/(spec\.py|schemas/repeater_spec\.schema\.json)$
+        # utils.py too: it defines the quantity aliases the schema inlines
+        # as shared $defs, so a change there moves the generated contract.
+        files: ^src/repeaterbook/(spec\.py|utils\.py|schemas/repeater_spec\.schema\.json)$
         pass_filenames: false
         stages: [pre-commit]
