@@ -12,21 +12,29 @@ __all__: tuple[str, ...] = (
 )
 
 import pathlib
+from functools import lru_cache
+from typing import Annotated
 
 import attrs
-from anyio import Path
+from anyio import Path, to_thread
 from fastmcp import FastMCP
 from pycountry import countries
 from pycountry.db import Country  # noqa: TC002
-from pydantic import DirectoryPath, EmailStr, SecretStr, field_validator
+from pydantic import EmailStr, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from repeaterbook.database import RepeaterBook
 from repeaterbook.exceptions import RepeaterBookUnauthorizedError
 from repeaterbook.mcp import service
 from repeaterbook.models import ExportQuery, Mode
+from repeaterbook.queries import BandName  # noqa: TC001
 from repeaterbook.services import RepeaterBookAPI
-from repeaterbook.spec import RepeaterMode, RepeaterSpec
+from repeaterbook.spec import (
+    RepeaterMode,
+    RepeaterSpec,
+    RepeaterStatus,
+    RepeaterUse,
+)
 from repeaterbook.utils import LatLon
 
 mcp = FastMCP("repeaterbook")
@@ -54,9 +62,24 @@ class RepeaterBookSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="REPEATERBOOK_")
 
-    working_dir: DirectoryPath = pathlib.Path()
-    app_contact: EmailStr = "unknown@example.com"
+    working_dir: pathlib.Path = pathlib.Path()
+    """Where the SQLite DB and HTTP cache live. Created on first use."""
+
+    app_contact: EmailStr
+    """Contact address for the API User-Agent.
+
+    Required: RepeaterBook's terms of use oblige callers to identify
+    themselves, so there is no honest default to fall back to.
+    """
+
     app_token: SecretStr | None = None
+    """Optional RepeaterBook API token."""
+
+    @field_validator("working_dir")
+    @classmethod
+    def _expand(cls, value: pathlib.Path) -> pathlib.Path:
+        """Expand a leading ``~``, which the shell does not expand inside env vars."""
+        return value.expanduser()
 
     @field_validator("app_token")
     @classmethod
@@ -65,60 +88,47 @@ class RepeaterBookSettings(BaseSettings):
         return value or None
 
 
-_context: _Context | None = None
-
-
+@lru_cache(maxsize=1)
 def _get_context() -> _Context:
-    global _context  # noqa: PLW0603
-    if _context is None:
-        settings = RepeaterBookSettings()
-        working_dir = Path(settings.working_dir)
-        api = RepeaterBookAPI(
-            app_contact=settings.app_contact,
-            app_token=(
-                settings.app_token.get_secret_value() if settings.app_token else None
-            ),
-            working_dir=working_dir,
-        )
-        db = RepeaterBook(working_dir=working_dir)
-        db.init_db()
-        _context = _Context(api=api, db=db)
-    return _context
+    """Build (once) the API client and DB handle this server's tools share."""
+    # `model_validate({})` rather than `RepeaterBookSettings()`: both read the
+    # environment, but only this form tells a type checker that the required
+    # `app_contact` is supplied at runtime rather than by the caller.
+    settings = RepeaterBookSettings.model_validate({})
+    # The working dir is this server's to own: it is where we put the SQLite
+    # file and the HTTP cache, so create it rather than demanding it exist.
+    settings.working_dir.mkdir(parents=True, exist_ok=True)
+    working_dir = Path(settings.working_dir)
+    api = RepeaterBookAPI(
+        app_contact=settings.app_contact,
+        # Stays a SecretStr end to end: RepeaterBookAPI masks it in its repr
+        # and only unwraps it when building the X-RB-App-Token header.
+        app_token=settings.app_token,
+        working_dir=working_dir,
+    )
+    db = RepeaterBook(working_dir=working_dir)
+    db.init_db()
+    return _Context(api=api, db=db)
 
 
-def _reset_context_for_tests() -> None:
-    """Clear the cached context so env changes take effect (tests only)."""
-    global _context  # noqa: PLW0603
-    _context = None
+def _api_modes(modes: set[RepeaterMode] | None) -> frozenset[Mode]:
+    """Translate RepeaterModes into the library's API-filterable Modes.
 
-
-def _api_modes(modes: list[str] | None) -> frozenset[Mode]:
-    """Translate RepeaterMode names into the library's API-filterable Modes.
-
-    Unknown names raise ValueError. Modes the API can't scope (DSTAR/FUSION/M17)
-    are simply omitted from the result; local filtering still applies to them.
+    Modes the API can't scope (DSTAR/FUSION/M17) are simply omitted from the
+    result; local filtering still applies to them.
     """
     if not modes:
         return frozenset()
-    result: set[Mode] = set()
-    for name in modes:
-        try:
-            rmode = RepeaterMode(name)
-        except ValueError as exc:
-            valid = ", ".join(m.value for m in RepeaterMode)
-            msg = f"unknown mode: {name!r}; valid modes: {valid}"
-            raise ValueError(msg) from exc
-        api = _MODE_TO_API.get(rmode)
-        if api is not None:
-            result.add(api)
-    return frozenset(result)
+    return frozenset(
+        api for mode in modes if (api := _MODE_TO_API.get(mode)) is not None
+    )
 
 
 def _build_query(
     country: str | None,
     state_id: str | None,
     region: str | None,
-    modes: list[str] | None,
+    modes: set[RepeaterMode] | None,
 ) -> ExportQuery:
     """Build an ExportQuery from a scope, raising ValueError on bad input."""
     country_set: frozenset[Country] = frozenset()
@@ -141,7 +151,7 @@ async def sync_repeaters(
     country: str | None = None,
     state_id: str | None = None,
     region: str | None = None,
-    modes: list[str] | None = None,
+    modes: set[RepeaterMode] | None = None,
 ) -> int:
     """Download repeaters for a region into the local store; returns the count."""
     ctx = _get_context()
@@ -155,42 +165,60 @@ async def sync_repeaters(
 
 @mcp.tool()
 async def search_repeaters(  # noqa: PLR0913
-    lat: float,
-    lon: float,
-    radius_km: float,
+    lat: Annotated[float, Field(ge=-90, le=90)],
+    lon: Annotated[float, Field(ge=-180, le=180)],
+    radius_km: Annotated[float, Field(gt=0)],
     country: str | None = None,
     state_id: str | None = None,
     region: str | None = None,
-    bands: list[str] | None = None,
-    modes: list[str] | None = None,
-    status: list[str] | None = None,
-    use: list[str] | None = None,
+    bands: set[BandName] | None = None,
+    modes: set[RepeaterMode] | None = None,
+    status: set[RepeaterStatus] | None = None,
+    use: set[RepeaterUse] | None = None,
+    *,
+    refresh: bool = False,
 ) -> list[RepeaterSpec]:
-    """Find nearby repeaters as repeater-specs, auto-syncing the region."""
+    """Find nearby repeaters as repeater-specs.
+
+    Searches the local store. When a country/state/region scope is given and
+    the store holds nothing for it yet, the region is downloaded first. Pass
+    `refresh=True` to force a re-download of an already-populated scope.
+    """
     ctx = _get_context()
-    if country or state_id or region:
+    scoped = bool(country or state_id or region)
+    # Syncing re-parses the whole regional payload and re-merges thousands of
+    # rows, so don't do it on every search: only when asked, or when we have
+    # nothing to search.
+    empty = not await to_thread.run_sync(ctx.db.query)
+    if scoped and (refresh or empty):
         await sync_repeaters(country, state_id, region, modes)
-    elif not ctx.db.query():
+    elif empty:
         msg = "no local data; provide a country/region or call sync_repeaters first"
         raise ValueError(msg)
-    return service.search(
-        ctx.db,
-        LatLon(lat, lon),
-        radius_km,
-        bands=bands,
-        modes=modes,
-        statuses=status,
-        uses=use,
-    )
+
+    def _search() -> list[RepeaterSpec]:
+        return service.search(
+            ctx.db,
+            LatLon(lat, lon),
+            radius_km,
+            bands=bands,
+            modes=modes,
+            statuses=status,
+            uses=use,
+        )
+
+    # SQLite reads plus a haversine pass over every row: run it off the event
+    # loop so concurrent tool calls aren't blocked.
+    return await to_thread.run_sync(_search)
 
 
 @mcp.tool()
 async def get_repeater(source_id: str) -> list[RepeaterSpec]:
     """Return repeater-specs for a single repeater by its source id."""
     ctx = _get_context()
-    return service.get_by_id(ctx.db, source_id)
+    return await to_thread.run_sync(service.get_by_id, ctx.db, source_id)
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover - process entry point
     """Run the MCP server over stdio."""
     mcp.run()
