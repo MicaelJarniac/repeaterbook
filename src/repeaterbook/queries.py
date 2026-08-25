@@ -4,14 +4,16 @@ from __future__ import annotations
 
 __all__: tuple[str, ...] = (
     "Band",
+    "BandName",
     "Bands",
     "band",
+    "band_of",
     "filter_radius",
     "square",
 )
 
 from decimal import Decimal
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import TYPE_CHECKING, NamedTuple
 
 from haversine import haversine  # type: ignore[import-untyped]
@@ -100,6 +102,31 @@ class Bands(Band, Enum):
     CM_23 = Band(low=Decimal("1240.0"), high=Decimal("1300.0"))
     CM_13 = Band(low=Decimal("2300.0"), high=Decimal("2450.0"))
     CM_3 = Band(low=Decimal("10000.0"), high=Decimal("10500.0"))
+
+
+class BandName(StrEnum):
+    """Amateur band names, as a string vocabulary.
+
+    `Bands` members carry their bounds as a `NamedTuple` value, which renders
+    in JSON Schema as a two-number array -- meaningless to a consumer that
+    just wants to name a band. This mirrors `Bands` member-for-member as
+    plain strings; `test_band_name_matches_bands` guards against drift.
+    """
+
+    M_10 = "M_10"
+    M_6 = "M_6"
+    M_4 = "M_4"
+    M_2 = "M_2"
+    CM_70 = "CM_70"
+    CM_33 = "CM_33"
+    CM_23 = "CM_23"
+    CM_13 = "CM_13"
+    CM_3 = "CM_3"
+
+
+def band_of(name: BandName) -> Bands:
+    """Return the `Bands` member, with its bounds, for a band name."""
+    return Bands[name.value]
 
 
 def band(*bands: Band) -> ColumnElement[bool]:
