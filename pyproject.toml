@@ -128,8 +128,8 @@ unfixable = ["ERA001"]
 
 [tool.ruff.lint.per-file-ignores]
 # S101: asserts are the point. PLR2004: magic numbers are fixture data.
-# S106: "tokens" here are literal test fixtures, not credentials.
-"tests/*" = ["S101", "PLR2004", "S106"]
+# S106/S107: "tokens" here are literal test fixtures, not credentials.
+"tests/*" = ["S101", "PLR2004", "S106", "S107"]
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id", "type"]

@@ -20,7 +20,7 @@ class SampleRepeaterFactory(Protocol):
 class McpEnvFactory(Protocol):
     """Return type of the ``mcp_env`` fixture: an env configurator."""
 
-    def __call__(self, token: str | None = None, **env: str) -> None:
+    def __call__(self, token: str | None = "rbuapp_test", **env: str) -> None:
         """Point the MCP server at a temp working dir and reset its context."""
         ...
 

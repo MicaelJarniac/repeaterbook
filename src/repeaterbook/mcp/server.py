@@ -74,8 +74,14 @@ class RepeaterBookSettings(BaseSettings):
     themselves, so there is no honest default to fall back to.
     """
 
-    app_token: SecretStr | None = None
-    """Optional RepeaterBook API token."""
+    app_token: SecretStr
+    """Per-user RepeaterBook API token.
+
+    Required: as of RepeaterBook's 2026-03-03 API policy every export needs
+    an approved ``rbuapp_`` token, and an unauthenticated request is refused
+    with ``401 auth_missing``. Demanding it up front turns that into a
+    startup error rather than a failure on the first tool call.
+    """
 
     @field_validator("working_dir")
     @classmethod
@@ -85,9 +91,17 @@ class RepeaterBookSettings(BaseSettings):
 
     @field_validator("app_token")
     @classmethod
-    def _empty_token_is_none(cls, value: SecretStr | None) -> SecretStr | None:
-        """Treat an empty-string token the same as an unset one."""
-        return value or None
+    def _reject_blank_token(cls, value: SecretStr) -> SecretStr:
+        """Reject an empty or whitespace-only token.
+
+        An env var set to the empty string is a misconfiguration, not a
+        request to run unauthenticated -- and running unauthenticated is not
+        possible anyway.
+        """
+        if not value.get_secret_value().strip():
+            msg = "must not be empty"
+            raise ValueError(msg)
+        return value
 
 
 @lru_cache(maxsize=1)
@@ -262,7 +276,14 @@ async def sync_repeaters(
     try:
         return await service.sync(ctx.api, ctx.db, query)
     except RepeaterBookUnauthorizedError as exc:
-        msg = "RepeaterBook auth failed; check REPEATERBOOK_APP_TOKEN"
+        # A token is required to start, so reaching here means the one we have
+        # is wrong rather than absent: expired, revoked, or issued for another
+        # application or User-Agent.
+        msg = (
+            f"RepeaterBook rejected the API token ({exc}). Check that "
+            "REPEATERBOOK_APP_TOKEN is current and issued for this "
+            "application."
+        )
         raise ValueError(msg) from exc
 
 

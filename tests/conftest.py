@@ -145,10 +145,12 @@ def mcp_env(
     """
     from repeaterbook.mcp import server  # noqa: PLC0415
 
-    def _configure(token: str | None = None, **env: str) -> None:
+    def _configure(token: str | None = "rbuapp_test", **env: str) -> None:
         monkeypatch.setenv("REPEATERBOOK_WORKING_DIR", str(tmp_path))
         monkeypatch.setenv("REPEATERBOOK_APP_CONTACT", "test@example.com")
-        if token is not None:
+        if token is None:
+            monkeypatch.delenv("REPEATERBOOK_APP_TOKEN", raising=False)
+        else:
             monkeypatch.setenv("REPEATERBOOK_APP_TOKEN", token)
         for key, value in env.items():
             monkeypatch.setenv(key, value)

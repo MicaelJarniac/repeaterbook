@@ -114,13 +114,34 @@ def test_token_is_masked_in_repr(mcp_env: McpEnvFactory) -> None:
     assert "rbuapp_s3cret" not in repr(server._get_context().api)  # noqa: SLF001
 
 
-def test_empty_token_sends_no_auth_header(mcp_env: McpEnvFactory) -> None:
-    """Test an empty-string token is treated as unset, sending no auth header."""
-    mcp_env(token="")
+@pytest.mark.parametrize("token", ["", "   "])
+def test_blank_token_is_rejected(
+    mcp_env: McpEnvFactory,
+    token: str,
+) -> None:
+    """Test a blank token is a configuration error, not a request to skip auth.
 
-    headers = server._get_context().api.headers  # noqa: SLF001
+    Every export needs an approved token, so there is no unauthenticated mode
+    to fall back to; an empty env var is a mistake worth naming.
+    """
+    mcp_env(token=token)
 
-    assert "X-RB-App-Token" not in headers
+    with pytest.raises(ValidationError, match="app_token"):
+        server.RepeaterBookSettings.model_validate({})
+
+
+def test_missing_token_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test the server refuses to start without a token.
+
+    The live API answers an unauthenticated export with 401 auth_missing, so
+    failing at startup beats failing on the first tool call.
+    """
+    monkeypatch.delenv("REPEATERBOOK_APP_TOKEN", raising=False)
+    monkeypatch.setenv("REPEATERBOOK_APP_CONTACT", "test@example.com")
+    server._get_context.cache_clear()  # noqa: SLF001
+
+    with pytest.raises(ValidationError, match="app_token"):
+        server.RepeaterBookSettings.model_validate({})
 
 
 def test_missing_contact_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -130,6 +151,7 @@ def test_missing_contact_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     no honest default; a placeholder would quietly misidentify every request.
     """
     monkeypatch.delenv("REPEATERBOOK_APP_CONTACT", raising=False)
+    monkeypatch.setenv("REPEATERBOOK_APP_TOKEN", "rbuapp_test")
     server._get_context.cache_clear()  # noqa: SLF001
 
     with pytest.raises(ValidationError, match="app_contact"):
@@ -139,6 +161,7 @@ def test_missing_contact_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_malformed_contact_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test a non-address contact string is rejected."""
     monkeypatch.setenv("REPEATERBOOK_APP_CONTACT", "not-an-email")
+    monkeypatch.setenv("REPEATERBOOK_APP_TOKEN", "rbuapp_test")
 
     with pytest.raises(ValidationError, match="app_contact"):
         server.RepeaterBookSettings.model_validate({})
@@ -156,6 +179,7 @@ def test_working_dir_is_created_and_tilde_expanded(
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("REPEATERBOOK_WORKING_DIR", "~/.repeaterbook")
     monkeypatch.setenv("REPEATERBOOK_APP_CONTACT", "test@example.com")
+    monkeypatch.setenv("REPEATERBOOK_APP_TOKEN", "rbuapp_test")
     server._get_context.cache_clear()  # noqa: SLF001
 
     target = tmp_path / ".repeaterbook"
@@ -183,9 +207,10 @@ async def test_sync_wraps_auth_failure(
     """Test an auth failure surfaces as a ValueError naming the token env var.
 
     The library's RepeaterBookUnauthorizedError means nothing to an agent; the
-    tool should tell it which knob to turn.
+    tool should tell it which knob to turn. A token is required to start, so
+    this path means the configured one was refused, not that none was set.
     """
-    mcp_env(token="bad-token")
+    mcp_env(token="rbuapp_bad")
 
     async def _boom(*_: object, **__: object) -> int:
         msg = "auth_missing"
@@ -195,7 +220,7 @@ async def test_sync_wraps_auth_failure(
 
     monkeypatch.setattr(service, "sync", _boom)
 
-    with pytest.raises(ValueError, match="REPEATERBOOK_APP_TOKEN"):
+    with pytest.raises(ValueError, match="rejected the API token"):
         await server.sync_repeaters(country="Australia")
 
 

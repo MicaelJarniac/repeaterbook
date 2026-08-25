@@ -14,11 +14,21 @@ pip install "repeaterbook[mcp]"
 |---|---|---|
 | `REPEATERBOOK_WORKING_DIR` | Where the SQLite DB + cache live. Created if missing; a leading `~` is expanded. | `.` |
 | `REPEATERBOOK_APP_CONTACT` | Contact email for the API `User-Agent`. **Required** | — |
-| `REPEATERBOOK_APP_TOKEN` | Per-user `rbuapp_` API token | unset |
+| `REPEATERBOOK_APP_TOKEN` | Per-user `rbuapp_` API token. **Required** | — |
 
-`REPEATERBOOK_APP_CONTACT` has no default: RepeaterBook's terms of use oblige
-callers to identify themselves, and a placeholder address would quietly
-misidentify every request. The server refuses to start without a valid one.
+Neither of the last two has a default, and the server refuses to start
+without them.
+
+`REPEATERBOOK_APP_CONTACT` is required because RepeaterBook's terms of use
+oblige callers to identify themselves; a placeholder address would quietly
+misidentify every request.
+
+`REPEATERBOOK_APP_TOKEN` is required because, as of RepeaterBook's
+[2026-03-03 API policy](https://www.repeaterbook.com/wiki/doku.php?id=api),
+every export needs an approved per-user `rbuapp_` token — an unauthenticated
+request is refused with `401 auth_missing`. Generate one from
+[API Applications](https://www.repeaterbook.com/user/api_apps.php) while
+logged in.
 
 ## Register with an MCP client
 
@@ -29,7 +39,8 @@ misidentify every request. The server refuses to start without a valid one.
       "command": "repeaterbook-mcp",
       "env": {
         "REPEATERBOOK_WORKING_DIR": "~/.repeaterbook",
-        "REPEATERBOOK_APP_CONTACT": "you@example.com"
+        "REPEATERBOOK_APP_CONTACT": "you@example.com",
+        "REPEATERBOOK_APP_TOKEN": "rbuapp_..."
       }
     }
   }
