@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -14,12 +13,17 @@ from yarl import URL
 
 from repeaterbook.database import RepeaterBook
 from repeaterbook.mcp.service import get_by_id, search, sync
-from repeaterbook.models import ExportQuery, Repeater, Status, Use
+from repeaterbook.models import ExportQuery, Status, Use
+from repeaterbook.queries import BandName
 from repeaterbook.services import RepeaterBookAPI
+from repeaterbook.spec import RepeaterMode, RepeaterStatus, RepeaterUse
 from repeaterbook.utils import LatLon
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from repeaterbook.models import Repeater
+    from tests._types import PopulatedDbFactory, SampleRepeaterFactory
 
 pytestmark = pytest.mark.anyio
 
@@ -48,6 +52,8 @@ _ROW_RESULT: dict[str, Any] = {
     "Last Update": "2026-01-01",
 }
 
+_ORIGIN = LatLon(-27.47, 153.02)
+
 
 async def _row_handler(_: web.Request) -> web.Response:
     return web.json_response({"count": 1, "results": [_ROW_RESULT]})
@@ -72,196 +78,159 @@ async def test_sync_downloads_and_populates(
     assert rows[0].callsign == "VK4RBN"
 
 
-def _make_repeater(rid: int, lat: str, lon: str, **overrides: object) -> Repeater:
-    base: dict[str, object] = {
-        "state_id": "QLD",
-        "repeater_id": rid,
-        "frequency": Decimal("146.700"),
-        "input_frequency": Decimal("146.100"),
-        "pl_ctcss_uplink": "91.5",
-        "pl_ctcss_tsq_downlink": None,
-        "location_nearest_city": "Brisbane",
-        "landmark": None,
-        "region": None,
-        "country": "Australia",
-        "county": None,
-        "state": "Queensland",
-        "latitude": Decimal(lat),
-        "longitude": Decimal(lon),
-        "precise": True,
-        "callsign": f"VK4R{rid}",
-        "use_membership": Use.OPEN,
-        "operational_status": Status.ON_AIR,
-        "ares": None,
-        "races": None,
-        "skywarn": None,
-        "canwarn": None,
-        "allstar_node": None,
-        "echolink_node": None,
-        "irlp_node": None,
-        "wires_node": None,
-        "dmr_capable": False,
-        "dmr_id": None,
-        "dmr_color_code": None,
-        "d_star_capable": False,
-        "nxdn_capable": False,
-        "apco_p_25_capable": False,
-        "p_25_nac": None,
-        "m17_capable": False,
-        "m17_can": None,
-        "tetra_capable": False,
-        "tetra_mcc": None,
-        "tetra_mnc": None,
-        "yaesu_system_fusion_capable": False,
-        "ysf_digital_id_uplink": None,
-        "ysf_digital_id_downlink": None,
-        "ysf_dsc": None,
-        "analog_capable": True,
-        "fm_bandwidth": Decimal("25.0"),
-        "notes": None,
-        "last_update": date(2026, 1, 1),
-    }
-    base.update(overrides)
-    return Repeater(**base)
+@pytest.fixture
+def populated_db(tmp_path: Path) -> PopulatedDbFactory:
+    """Return a factory that builds a DB pre-populated with the given repeaters."""
+
+    def _populate(*repeaters: Repeater) -> RepeaterBook:
+        db = RepeaterBook(working_dir=AsyncPath(tmp_path))
+        if repeaters:
+            db.populate(repeaters)
+        else:
+            db.init_db()
+        return db
+
+    return _populate
 
 
-def test_search_orders_by_distance_and_clips_radius(tmp_path: Path) -> None:
+def test_search_orders_by_distance_and_clips_radius(
+    populated_db: PopulatedDbFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
     """Test search sorts by distance and excludes repeaters outside the radius."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.populate(
-        [
-            _make_repeater(1, "-27.47", "153.02"),  # ~0 km from origin
-            _make_repeater(2, "-27.60", "153.02"),  # ~14 km south
-            _make_repeater(3, "-28.50", "153.02"),  # ~114 km south (outside)
-        ]
+    db = populated_db(
+        sample_repeater(repeater_id=1),  # ~0 km from origin
+        sample_repeater(repeater_id=2, latitude=Decimal("-27.60")),  # ~14 km
+        sample_repeater(repeater_id=3, latitude=Decimal("-28.50")),  # ~114 km
     )
-    origin = LatLon(-27.47, 153.02)
 
-    intents = search(db, origin, radius_km=40.0)
+    specs = search(db, _ORIGIN, radius_km=40.0)
 
-    assert [spec.source_id for spec in intents] == ["QLD:1", "QLD:2"]
-    assert intents[0].distance_km is not None
-    assert intents[0].distance_km <= intents[1].distance_km
+    assert [spec.source_id for spec in specs] == ["QLD:1", "QLD:2"]
+    first, second = specs[0].distance_km, specs[1].distance_km
+    assert first is not None
+    assert second is not None
+    assert first <= second
 
 
-def test_search_filters_by_mode(tmp_path: Path) -> None:
+def test_search_filters_by_mode(
+    populated_db: PopulatedDbFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
     """Test search only returns repeater-specs matching the requested modes."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.populate(
-        [
-            _make_repeater(
-                1,
-                "-27.47",
-                "153.02",
-                analog_capable=True,
-                yaesu_system_fusion_capable=True,
-            ),
-        ]
+    db = populated_db(
+        sample_repeater(
+            repeater_id=1,
+            analog_capable=True,
+            yaesu_system_fusion_capable=True,
+        ),
     )
-    origin = LatLon(-27.47, 153.02)
 
-    intents = search(db, origin, radius_km=40.0, modes=["FUSION"])
+    specs = search(db, _ORIGIN, radius_km=40.0, modes={RepeaterMode.FUSION})
 
-    assert [spec.mode.value for spec in intents] == ["FUSION"]
+    assert [spec.mode for spec in specs] == [RepeaterMode.FUSION]
 
 
-def test_search_filters_by_band(tmp_path: Path) -> None:
+def test_search_filters_by_band(
+    populated_db: PopulatedDbFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
     """Test search restricts results to repeaters within the requested band."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.populate(
-        [
-            _make_repeater(1, "-27.47", "153.02"),  # 146.700 -> M_2
-            _make_repeater(
-                2, "-27.47", "153.02", frequency=Decimal("438.000")
-            ),  # CM_70
-        ]
+    db = populated_db(
+        sample_repeater(repeater_id=1),  # 146.700 -> M_2
+        sample_repeater(repeater_id=2, frequency=Decimal("438.000")),  # CM_70
     )
-    origin = LatLon(-27.47, 153.02)
 
-    intents = search(db, origin, radius_km=40.0, bands=["M_2"])
+    specs = search(db, _ORIGIN, radius_km=40.0, bands={BandName.M_2})
 
-    assert intents
-    assert all(spec.band == "M_2" for spec in intents)
-    assert "QLD:2" not in {spec.source_id for spec in intents}
+    assert specs
+    assert all(spec.band == "M_2" for spec in specs)
+    assert "QLD:2" not in {spec.source_id for spec in specs}
 
 
-def test_search_filters_by_status_and_use(tmp_path: Path) -> None:
+def test_search_filters_by_status_and_use(
+    populated_db: PopulatedDbFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
     """Test search excludes repeaters not matching requested status and use."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.populate(
-        [
-            _make_repeater(1, "-27.47", "153.02"),  # ON_AIR / OPEN (defaults)
-            _make_repeater(
-                2,
-                "-27.47",
-                "153.02",
-                operational_status=Status.OFF_AIR,
-                use_membership=Use.CLOSED,
-            ),
-        ]
+    db = populated_db(
+        sample_repeater(repeater_id=1),  # ON_AIR / OPEN (defaults)
+        sample_repeater(
+            repeater_id=2,
+            operational_status=Status.OFF_AIR,
+            use_membership=Use.CLOSED,
+        ),
     )
-    origin = LatLon(-27.47, 153.02)
 
-    intents = search(db, origin, radius_km=40.0, statuses=["ON_AIR"], uses=["OPEN"])
+    specs = search(
+        db,
+        _ORIGIN,
+        radius_km=40.0,
+        statuses={RepeaterStatus.ON_AIR},
+        uses={RepeaterUse.OPEN},
+    )
 
-    assert {spec.source_id for spec in intents} == {"QLD:1"}
-    assert all(spec.operational_status == "ON_AIR" for spec in intents)
-    assert all(spec.use == "OPEN" for spec in intents)
-
-
-def test_search_unknown_mode_raises(tmp_path: Path) -> None:
-    """Test search raises ValueError (not KeyError) for an unknown mode name."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.init_db()
-    origin = LatLon(-27.47, 153.02)
-
-    with pytest.raises(ValueError, match="mode"):
-        search(db, origin, radius_km=40.0, modes=["NOTAMODE"])
+    assert {spec.source_id for spec in specs} == {"QLD:1"}
+    assert all(spec.operational_status is RepeaterStatus.ON_AIR for spec in specs)
+    assert all(spec.use is RepeaterUse.OPEN for spec in specs)
 
 
-def test_search_unknown_band_raises(tmp_path: Path) -> None:
-    """Test search raises ValueError (not KeyError) for a typo'd band name."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.init_db()
-    origin = LatLon(-27.47, 153.02)
+def test_search_reports_distance_from_origin(
+    populated_db: PopulatedDbFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """Test the spec's distance_km reflects the true distance from the origin."""
+    db = populated_db(sample_repeater(repeater_id=1, latitude=Decimal("-27.60")))
 
-    with pytest.raises(ValueError, match="band"):
-        search(db, origin, radius_km=40.0, bands=["2m"])
+    specs = search(db, _ORIGIN, radius_km=40.0)
 
-
-def test_search_unknown_status_raises(tmp_path: Path) -> None:
-    """Test search raises ValueError (not KeyError) for a typo'd status name."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.init_db()
-    origin = LatLon(-27.47, 153.02)
-
-    with pytest.raises(ValueError, match="status"):
-        search(db, origin, radius_km=40.0, statuses=["on_air"])
+    distance = specs[0].distance_km
+    assert distance is not None
+    # ~14.5 km due south; allow slack for the haversine model.
+    assert Decimal(13) < distance < Decimal(16)
 
 
-def test_get_by_id_returns_intents(tmp_path: Path) -> None:
+def test_get_by_id_returns_specs(
+    populated_db: PopulatedDbFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
     """Test get_by_id returns specs for an existing repeater."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.populate([_make_repeater(7, "-27.47", "153.02")])
+    db = populated_db(sample_repeater(repeater_id=7))
 
-    intents = get_by_id(db, "QLD:7")
+    specs = get_by_id(db, "QLD:7")
 
-    assert len(intents) == 1
-    assert intents[0].source_id == "QLD:7"
+    assert len(specs) == 1
+    assert specs[0].source_id == "QLD:7"
+    # Not produced by a radius search, so there is no origin to measure from.
+    assert specs[0].distance_km is None
 
 
-def test_get_by_id_missing_returns_empty(tmp_path: Path) -> None:
+def test_get_by_id_missing_returns_empty(
+    populated_db: PopulatedDbFactory,
+) -> None:
     """Test get_by_id returns empty list for a missing repeater."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.init_db()
-
-    assert get_by_id(db, "QLD:999") == []
+    assert get_by_id(populated_db(), "QLD:999") == []
 
 
-def test_get_by_id_malformed_id_returns_empty(tmp_path: Path) -> None:
+def test_get_by_id_malformed_id_returns_empty(
+    populated_db: PopulatedDbFactory,
+) -> None:
     """Test get_by_id returns empty list for a non-numeric repeater id."""
-    db = RepeaterBook(working_dir=AsyncPath(tmp_path))
-    db.init_db()
-
+    db = populated_db()
     assert get_by_id(db, "garbage") == []
     assert get_by_id(db, "QLD:abc") == []
+
+
+def test_search_filters_by_use_alone(
+    populated_db: PopulatedDbFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """Test the use filter applies independently of the status filter."""
+    db = populated_db(
+        sample_repeater(repeater_id=1),  # OPEN (default)
+        sample_repeater(repeater_id=2, use_membership=Use.PRIVATE),
+    )
+
+    specs = search(db, _ORIGIN, radius_km=40.0, uses={RepeaterUse.OPEN})
+
+    assert {spec.source_id for spec in specs} == {"QLD:1"}
