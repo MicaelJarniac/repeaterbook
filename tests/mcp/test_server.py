@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from repeaterbook.exceptions import RepeaterBookUnauthorizedError
 from repeaterbook.mcp import server, service
 from repeaterbook.models import ExportQuery, Mode
+from repeaterbook.na_states import NAState, state_country
 from repeaterbook.spec import RepeaterMode
 
 if TYPE_CHECKING:
@@ -33,7 +34,7 @@ async def test_three_tools_registered() -> None:
 def test_build_query_resolves_country() -> None:
     """Test _build_query resolves a country name to an ExportQuery."""
     query = server._build_query(  # noqa: SLF001
-        country="Australia", state_id=None, region=None, modes=None
+        country="Australia", state=None, region=None, modes=None
     )
     assert isinstance(query, ExportQuery)
     assert any(c.name == "Australia" for c in query.countries)
@@ -43,7 +44,7 @@ def test_build_query_unknown_country_raises() -> None:
     """Test _build_query raises ValueError for an unresolvable country name."""
     with pytest.raises(ValueError, match="country"):
         server._build_query(  # noqa: SLF001
-            country="Nowhere", state_id=None, region=None, modes=None
+            country="Nowhere", state=None, region=None, modes=None
         )
 
 
@@ -51,7 +52,7 @@ def test_build_query_translates_api_mode() -> None:
     """Test _build_query translates FM into the library's Mode.ANALOG."""
     query = server._build_query(  # noqa: SLF001
         country="United States",
-        state_id=None,
+        state=None,
         region=None,
         modes={RepeaterMode.FM},
     )
@@ -62,7 +63,7 @@ def test_build_query_non_api_mode_yields_empty_modes() -> None:
     """Test _build_query leaves modes empty for a mode the API can't scope."""
     query = server._build_query(  # noqa: SLF001
         country="United States",
-        state_id=None,
+        state=None,
         region=None,
         modes={RepeaterMode.FUSION},
     )
@@ -73,7 +74,7 @@ def test_build_query_keeps_only_api_filterable_modes() -> None:
     """Test a mixed mode set keeps the API-filterable members and drops the rest."""
     query = server._build_query(  # noqa: SLF001
         country="United States",
-        state_id=None,
+        state=None,
         region=None,
         modes={RepeaterMode.FM, RepeaterMode.M17, RepeaterMode.DMR},
     )
@@ -285,3 +286,111 @@ async def test_get_repeater_reads_the_store(
     specs = await server.get_repeater("QLD:42")
 
     assert [s.source_id for s in specs] == ["QLD:42"]
+
+
+def test_build_query_uses_the_states_own_identifier() -> None:
+    """A state member is sent as RepeaterBook's identifier, not its name."""
+    query = server._build_query(  # noqa: SLF001
+        country="United States", state=NAState.US_CA, region=None, modes=None
+    )
+    assert query.state_ids == frozenset({"06"})
+
+
+@pytest.mark.parametrize(
+    ("state", "expected_id"),
+    [
+        (NAState.US_TX, "48"),
+        (NAState.CA_AB, "CA01"),
+        (NAState.MX_JAL, "MX14"),
+    ],
+)
+def test_build_query_covers_all_three_na_countries(
+    state: NAState,
+    expected_id: str,
+) -> None:
+    """Each NA country's identifier scheme survives the round trip."""
+    query = server._build_query(  # noqa: SLF001
+        country=state_country(state), state=state, region=None, modes=None
+    )
+    assert query.state_ids == frozenset({expected_id})
+
+
+def test_state_without_a_country_is_allowed() -> None:
+    """A state alone is unambiguous, so it need not repeat its country."""
+    query = server._build_query(  # noqa: SLF001
+        country=None, state=NAState.CA_ON, region=None, modes=None
+    )
+    assert query.state_ids == frozenset({"CA08"})
+
+
+def test_state_from_the_wrong_country_is_rejected() -> None:
+    """Pairing a state with another country must fail, not return nothing.
+
+    The API answers this combination with an empty result set, which is
+    indistinguishable from a region that genuinely has no repeaters.
+    """
+    with pytest.raises(ValueError, match="Canada subdivision"):
+        server._build_query(  # noqa: SLF001
+            country="United States", state=NAState.CA_AB, region=None, modes=None
+        )
+
+
+def test_state_with_a_row_country_is_rejected() -> None:
+    """A state is meaningless outside North America."""
+    with pytest.raises(ValueError, match="United States subdivision"):
+        server._build_query(  # noqa: SLF001
+            country="Australia", state=NAState.US_CA, region=None, modes=None
+        )
+
+
+def test_state_and_region_together_are_rejected() -> None:
+    """The two scope different endpoints and cannot be combined."""
+    with pytest.raises(ValueError, match="cannot be combined"):
+        server._build_query(  # noqa: SLF001
+            country=None, state=NAState.US_CA, region="Queensland", modes=None
+        )
+
+
+def test_region_with_an_na_country_is_rejected() -> None:
+    """Region is a rest-of-world parameter; the NA endpoint ignores it.
+
+    This is the original trap in reverse: country='Australia', state='Queensland'
+    routed to the NA endpoint and returned zero rows with no explanation.
+    """
+    with pytest.raises(ValueError, match="region is not supported"):
+        server._build_query(  # noqa: SLF001
+            country="Canada", state=None, region="Ontario", modes=None
+        )
+
+
+def test_region_with_a_row_country_is_accepted() -> None:
+    """The legitimate rest-of-world pairing still works."""
+    query = server._build_query(  # noqa: SLF001
+        country="Australia", state=None, region="Queensland", modes=None
+    )
+    assert query.regions == frozenset({"Queensland"})
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("United States", "United States"),
+        ("USA", "United States"),
+        ("South Korea", "Korea, Republic of"),
+        ("Russia", "Russian Federation"),
+    ],
+)
+def test_country_aliases_resolve(given: str, expected: str) -> None:
+    """Common aliases should resolve; an exact name always wins."""
+    query = server._build_query(  # noqa: SLF001
+        country=given, state=None, region=None, modes=None
+    )
+    assert {c.name for c in query.countries} == {expected}
+
+
+def test_unresolvable_country_still_raises() -> None:
+    """Fuzzy matching must not turn nonsense into a country."""
+    with pytest.raises(ValueError, match="unknown country"):
+        server._build_query(  # noqa: SLF001
+            country="Nowhereistan", state=None, region=None, modes=None
+        )

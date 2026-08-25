@@ -70,9 +70,10 @@ async def test_sync_downloads_and_populates(
         db = RepeaterBook(working_dir=AsyncPath(tmp_path))
         query = ExportQuery(countries=frozenset({countries.get(name="Australia")}))
 
-        count = await sync(api, db, query)
+        result = await sync(api, db, query)
 
-    assert count == 1
+    assert result.count == 1
+    assert result.truncated is False
     rows = db.query()
     assert len(rows) == 1
     assert rows[0].callsign == "VK4RBN"
@@ -234,3 +235,34 @@ def test_search_filters_by_use_alone(
     specs = search(db, _ORIGIN, radius_km=40.0, uses={RepeaterUse.OPEN})
 
     assert {spec.source_id for spec in specs} == {"QLD:1"}
+
+
+async def test_sync_flags_a_truncated_response(
+    local_server: Any,  # noqa: ANN401
+    tmp_path: Path,
+) -> None:
+    """A response at the API's cap must be reported as probably incomplete.
+
+    RepeaterBook silently truncates at max_count, so a caller that only sees
+    a row count cannot tell a complete small region from a clipped large one.
+    """
+
+    async def _handler(_: web.Request) -> web.Response:
+        rows = [{**_ROW_RESULT, "Rptr ID": i} for i in range(3)]
+        return web.json_response({"count": len(rows), "results": rows})
+
+    async with local_server(_handler, path="/api/exportROW.php") as url:
+        base = URL.build(scheme=url.scheme, host=url.host, port=url.port)
+        # max_count=3 makes the cap reachable without inventing 3500 rows.
+        api = RepeaterBookAPI(
+            base_url=base, working_dir=AsyncPath(tmp_path), max_count=3
+        )
+        db = RepeaterBook(working_dir=AsyncPath(tmp_path))
+        query = ExportQuery(countries=frozenset({countries.get(name="Australia")}))
+
+        result = await sync(api, db, query)
+
+    assert result.count == 3
+    assert result.truncated is True
+    assert result.detail is not None
+    assert "Narrow it" in result.detail

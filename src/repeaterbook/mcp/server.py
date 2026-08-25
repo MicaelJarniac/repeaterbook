@@ -13,11 +13,12 @@ __all__: tuple[str, ...] = (
 
 import pathlib
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, cast
 
 import attrs
 from anyio import Path, to_thread
 from fastmcp import FastMCP
+from loguru import logger
 from pycountry import countries
 from pycountry.db import Country  # noqa: TC002
 from pydantic import EmailStr, Field, SecretStr, field_validator
@@ -27,6 +28,7 @@ from repeaterbook.database import RepeaterBook
 from repeaterbook.exceptions import RepeaterBookUnauthorizedError
 from repeaterbook.mcp import service
 from repeaterbook.models import ExportQuery, Mode
+from repeaterbook.na_states import NAState, state_country
 from repeaterbook.queries import BandName  # noqa: TC001
 from repeaterbook.services import RepeaterBookAPI
 from repeaterbook.spec import (
@@ -124,38 +126,139 @@ def _api_modes(modes: set[RepeaterMode] | None) -> frozenset[Mode]:
     )
 
 
+def _resolve_country(name: str) -> Country:
+    """Resolve a country name, tolerating the aliases people actually use.
+
+    An exact match wins outright. Otherwise fall back to pycountry's fuzzy
+    search, which handles "USA", "South Korea" and "Russia" -- none of which
+    match by name. Fuzzy results are ranked, and the top hit is not always
+    right ("USA" also matches Indonesia and Azerbaijan), so an ambiguous
+    match reports its candidates rather than silently picking one.
+    """
+    exact = countries.get(name=name)
+    if exact is not None:
+        return cast("Country", exact)
+    try:
+        matches = cast("list[Country]", countries.search_fuzzy(name))
+    except LookupError:
+        matches = []
+    if not matches:
+        msg = f"unknown country: {name!r}"
+        raise ValueError(msg)
+    best = matches[0]
+    if len(matches) > 1:
+        alternatives = ", ".join(repr(c.name) for c in matches[1:4])
+        logger.info(
+            f"Country {name!r} resolved to {best.name!r} "
+            f"(other candidates: {alternatives})"
+        )
+    return best
+
+
+def _check_scope(
+    country: Country | None,
+    state: NAState | None,
+    region: str | None,
+) -> None:
+    """Reject scope combinations the API answers with silence.
+
+    ``state_id`` only exists on the North America endpoint and ``region``
+    only on the rest-of-world one, so pairing either with the wrong country
+    produces an empty result set rather than an error -- indistinguishable
+    from a region that genuinely has no repeaters.
+    """
+    if state is not None:
+        expected = state_country(state)
+        if country is not None and country.name != expected:
+            msg = (
+                f"{state.name} is a {expected} subdivision, but country is "
+                f"{country.name!r}. Pass country={expected!r}, or drop the "
+                f"state to search {country.name} as a whole."
+            )
+            raise ValueError(msg)
+        if region is not None:
+            msg = (
+                "state and region cannot be combined: state scopes the North "
+                "America endpoint, region scopes the rest-of-world one."
+            )
+            raise ValueError(msg)
+    elif (
+        region is not None
+        and country is not None
+        and country.name in RepeaterBookAPI.NA_COUNTRIES
+    ):
+        msg = (
+            f"region is not supported for {country.name!r}, which is served by "
+            f"the North America endpoint. Use a state instead."
+        )
+        raise ValueError(msg)
+
+
 def _build_query(
     country: str | None,
-    state_id: str | None,
+    state: NAState | None,
     region: str | None,
     modes: set[RepeaterMode] | None,
 ) -> ExportQuery:
     """Build an ExportQuery from a scope, raising ValueError on bad input."""
-    country_set: frozenset[Country] = frozenset()
-    if country is not None:
-        found = countries.get(name=country)
-        if found is None:
-            msg = f"unknown country: {country!r}"
-            raise ValueError(msg)
-        country_set = frozenset({found})
+    resolved = _resolve_country(country) if country is not None else None
+    _check_scope(resolved, state, region)
     return ExportQuery(
-        countries=country_set,
-        state_ids=frozenset({state_id}) if state_id else frozenset(),
+        countries=frozenset({resolved}) if resolved is not None else frozenset(),
+        state_ids=frozenset({state.value}) if state is not None else frozenset(),
         regions=frozenset({region}) if region else frozenset(),
         modes=_api_modes(modes),
     )
 
 
+_Country = Annotated[
+    str | None,
+    Field(
+        description=(
+            "Country name, e.g. 'United States' or 'Switzerland'. Common "
+            "aliases such as 'USA' are resolved where unambiguous."
+        )
+    ),
+]
+
+_State = Annotated[
+    NAState | None,
+    Field(
+        description=(
+            "State, province or territory, for the United States, Canada and "
+            "Mexico only. Strongly recommended for these countries: the API "
+            "returns at most 3500 rows, so a whole-country query is silently "
+            "truncated. Use `region` elsewhere."
+        )
+    ),
+]
+
+_Region = Annotated[
+    str | None,
+    Field(
+        description=(
+            "Region within a country outside North America, where the source "
+            "provides one. Use `state` for the US, Canada and Mexico."
+        )
+    ),
+]
+
+
 @mcp.tool()
 async def sync_repeaters(
-    country: str | None = None,
-    state_id: str | None = None,
-    region: str | None = None,
+    country: _Country = None,
+    state: _State = None,
+    region: _Region = None,
     modes: set[RepeaterMode] | None = None,
-) -> int:
-    """Download repeaters for a region into the local store; returns the count."""
+) -> service.SyncResult:
+    """Download repeaters for a region into the local store.
+
+    Scope the download as narrowly as you can. RepeaterBook caps a response at
+    3500 rows and gives no indication when it truncates, so large scopes
+    quietly return partial data. The result flags this when it happens.
+    """
     ctx = _get_context()
-    query = _build_query(country, state_id, region, modes)
+    query = _build_query(country, state, region, modes)
     try:
         return await service.sync(ctx.api, ctx.db, query)
     except RepeaterBookUnauthorizedError as exc:
@@ -168,9 +271,9 @@ async def search_repeaters(  # noqa: PLR0913
     lat: Annotated[float, Field(ge=-90, le=90)],
     lon: Annotated[float, Field(ge=-180, le=180)],
     radius_km: Annotated[float, Field(gt=0)],
-    country: str | None = None,
-    state_id: str | None = None,
-    region: str | None = None,
+    country: _Country = None,
+    state: _State = None,
+    region: _Region = None,
     bands: set[BandName] | None = None,
     modes: set[RepeaterMode] | None = None,
     status: set[RepeaterStatus] | None = None,
@@ -185,13 +288,13 @@ async def search_repeaters(  # noqa: PLR0913
     `refresh=True` to force a re-download of an already-populated scope.
     """
     ctx = _get_context()
-    scoped = bool(country or state_id or region)
+    scoped = bool(country or state or region)
     # Syncing re-parses the whole regional payload and re-merges thousands of
     # rows, so don't do it on every search: only when asked, or when we have
     # nothing to search.
     empty = not await to_thread.run_sync(ctx.db.query)
     if scoped and (refresh or empty):
-        await sync_repeaters(country, state_id, region, modes)
+        await sync_repeaters(country, state, region, modes)
     elif empty:
         msg = "no local data; provide a country/region or call sync_repeaters first"
         raise ValueError(msg)

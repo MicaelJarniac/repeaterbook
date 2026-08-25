@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-__all__: tuple[str, ...] = ("get_by_id", "search", "sync")
+__all__: tuple[str, ...] = ("SyncResult", "get_by_id", "search", "sync")
 
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from haversine import Unit, haversine  # type: ignore[import-untyped]
+from pydantic import BaseModel, Field
 
 from repeaterbook.models import Repeater, Status, Use
 from repeaterbook.queries import band, band_of, filter_radius, square
@@ -23,11 +24,44 @@ if TYPE_CHECKING:
     from repeaterbook.utils import LatLon
 
 
-async def sync(api: RepeaterBookAPI, db: RepeaterBook, query: ExportQuery) -> int:
+class SyncResult(BaseModel):
+    """Outcome of a sync, including whether the API truncated the response."""
+
+    count: int = Field(description="Repeaters downloaded and stored.")
+    truncated: bool = Field(
+        description=(
+            "True when the response hit RepeaterBook's per-response limit, "
+            "meaning rows were almost certainly dropped."
+        )
+    )
+    detail: str | None = Field(
+        default=None, description="How to narrow the scope, when truncated."
+    )
+
+
+async def sync(
+    api: RepeaterBookAPI,
+    db: RepeaterBook,
+    query: ExportQuery,
+) -> SyncResult:
     """Download repeaters for a query and merge them into the local DB."""
     repeaters = await api.download(query)
     db.populate(repeaters)
-    return len(repeaters)
+    # The API caps a response and says nothing about it, so a query at the
+    # limit has almost certainly lost rows. The library logs this, but a log
+    # line is invisible to an MCP caller: report it in the result instead.
+    truncated = len(repeaters) >= api.max_count
+    return SyncResult(
+        count=len(repeaters),
+        truncated=truncated,
+        detail=(
+            f"RepeaterBook returned {len(repeaters)} rows, its per-response "
+            "limit, so this scope is very likely incomplete. Narrow it (for "
+            "the US, Canada and Mexico, sync one state at a time)."
+            if truncated
+            else None
+        ),
+    )
 
 
 def search(  # noqa: PLR0913 - keyword-only filters mirror the MCP tool's params
