@@ -14,7 +14,7 @@ pip install "repeaterbook[mcp]"
 |---|---|---|
 | `REPEATERBOOK_WORKING_DIR` | Where the SQLite DB + cache live. Created if missing; a leading `~` is expanded. | `.` |
 | `REPEATERBOOK_APP_CONTACT` | Contact email for the API `User-Agent`. **Required** | — |
-| `REPEATERBOOK_APP_TOKEN` | Optional API token | unset |
+| `REPEATERBOOK_APP_TOKEN` | Per-user `rbuapp_` API token | unset |
 
 `REPEATERBOOK_APP_CONTACT` has no default: RepeaterBook's terms of use oblige
 callers to identify themselves, and a placeholder address would quietly
@@ -38,8 +38,8 @@ misidentify every request. The server refuses to start without a valid one.
 
 ## Tools
 
-- `sync_repeaters(country?, state_id?, region?, modes?) -> int` — download a region into the local store.
-- `search_repeaters(lat, lon, radius_km, country?, state_id?, region?, bands?, modes?, status?, use?, refresh?) -> [RepeaterSpec]` — nearby repeaters, distance-sorted.
+- `sync_repeaters(country?, state?, region?, modes?) -> SyncResult` — download a region into the local store.
+- `search_repeaters(lat, lon, radius_km, country?, state?, region?, bands?, modes?, status?, use?, refresh?) -> [RepeaterSpec]` — nearby repeaters, distance-sorted.
 - `get_repeater(source_id) -> [RepeaterSpec]` — one repeater by `"state_id:repeater_id"`.
 
 Every filter is an enum, so its allowed values ride in the tool schema and a
@@ -51,10 +51,51 @@ client sees them without consulting these docs:
 | `modes` | `FM` `DMR` `DSTAR` `FUSION` `P25` `NXDN` `TETRA` `M17` |
 | `status` | `ON_AIR` `OFF_AIR` `UNKNOWN` |
 | `use` | `OPEN` `PRIVATE` `CLOSED` |
+| `state` | RepeaterBook's own NA identifiers — see below |
 
 `modes` is one vocabulary across both tools. For `sync_repeaters`, DSTAR/FUSION/M17
 don't narrow the server-side download (the RepeaterBook API has no filter for
 them) and are instead filtered locally during `search_repeaters`.
+
+### Scoping a query
+
+RepeaterBook returns **at most 3500 rows per response** and gives no
+indication when it truncates. A whole-country query for a large country comes
+back looking like a success while quietly missing data, so scope narrowly.
+
+Which parameter to use depends on the country:
+
+- **United States, Canada, Mexico** — use `state`. These are served by the
+  `export.php` endpoint, which understands `state_id` but not `region`.
+- **Everywhere else** — use `region`, served by `exportROW.php`.
+
+Mixing them up used to return zero results with no explanation; the tools now
+reject the combination with an error naming the right parameter.
+
+`state` values are **RepeaterBook's own identifiers**, not ISO 3166-2, and
+cannot be derived from it:
+
+| Subdivision | RepeaterBook | ISO 3166-2 |
+|---|---|---|
+| California | `06` | `US-CA` |
+| Alberta | `CA01` | `CA-AB` |
+| Jalisco | `MX14` | `MX-JAL` |
+
+The US uses two-digit FIPS codes; Canada and Mexico use bespoke `CA##`/`MX##`
+numbering that RepeaterBook does not document publicly. They're also
+unforgiving — `6` is not `06` and returns nothing rather than erroring, and
+lower-case `ca01` is rejected outright. The tools take an enum
+(`repeaterbook.na_states.NAState`) so the full list travels in the tool schema
+and neither mistake is possible.
+
+Because the 3500-row cap hides data, these identifiers can't be discovered by
+syncing a country and reading them back: any subdivision missing from the
+truncated slice would be invisible, and a subdivision with no repeaters yet is
+still a valid query value. That's why the library carries the list.
+
+`sync_repeaters` returns a `SyncResult` with `count`, `truncated` and
+`detail`. When `truncated` is true the scope hit the cap and is very likely
+incomplete.
 
 ### Syncing
 
