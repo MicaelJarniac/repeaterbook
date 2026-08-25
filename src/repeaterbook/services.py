@@ -20,7 +20,7 @@ from contextlib import suppress
 from datetime import date, timedelta
 from decimal import Decimal
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Final, NotRequired, TypedDict, cast
 
 import aiohttp
 import attrs
@@ -416,8 +416,10 @@ class RepeaterBookAPI:
         """Rest of world (not north-america) export URL."""
         return self.url_api / "exportROW.php"
 
-    # North America countries served by export.php endpoint
-    NA_COUNTRIES: frozenset[str] = frozenset(
+    # North America countries served by export.php endpoint. ClassVar so it
+    # stays a constant rather than becoming a per-instance attrs field, and so
+    # callers can read it off the class without building a client.
+    NA_COUNTRIES: ClassVar[frozenset[str]] = frozenset(
         {
             "United States",
             "Canada",
