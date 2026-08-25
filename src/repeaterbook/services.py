@@ -26,6 +26,7 @@ import aiohttp
 import attrs
 from anyio import Path
 from loguru import logger
+from pydantic import SecretStr
 from tqdm import tqdm
 from yarl import URL
 
@@ -327,6 +328,11 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
     )
 
 
+def _to_secret(value: SecretStr | str) -> SecretStr:
+    """Wrap a bare token string in a SecretStr, leaving an existing one alone."""
+    return value if isinstance(value, SecretStr) else SecretStr(value)
+
+
 @attrs.frozen
 class RepeaterBookAPI:
     """Unofficial client for the RepeaterBook.com API.
@@ -341,6 +347,8 @@ class RepeaterBookAPI:
         app_token: Optional per-user RepeaterBook API token, sent via the
             X-RB-App-Token header. Live exports require an approved
             rbuapp_ token as of RepeaterBook's 2026-03-03 API policy.
+            Held as a `SecretStr` so it is masked in reprs and logs; a plain
+            `str` is accepted and wrapped.
         working_dir: Directory for cache and database files.
         max_cache_age: Maximum age of cached API responses before refresh.
             Defaults to 1 hour.
@@ -357,7 +365,14 @@ class RepeaterBookAPI:
     # the User-Agent registered with RepeaterBook.
     app_version: str = "0.6.0"
     app_contact: str = "micael@jarniac.dev"
-    app_token: str | None = attrs.field(default=None, repr=False)
+    # repr=False and SecretStr are belt and braces: the former keeps the token
+    # out of attrs' own repr, the latter out of anything that formats the
+    # field value directly.
+    app_token: SecretStr | None = attrs.field(
+        default=None,
+        repr=False,
+        converter=attrs.converters.optional(_to_secret),
+    )
 
     working_dir: Path = attrs.Factory(Path)
 
@@ -383,7 +398,7 @@ class RepeaterBookAPI:
             "User-Agent": f"{self.app_name}/{self.app_version} (+{self.app_contact})",
         }
         if self.app_token:
-            headers["X-RB-App-Token"] = self.app_token
+            headers["X-RB-App-Token"] = self.app_token.get_secret_value()
         return headers
 
     @property
