@@ -20,9 +20,10 @@ __all__: tuple[str, ...] = (
     "Params",
     "RepeaterMode",
     "RepeaterSpec",
-    "StatusName",
+    "RepeaterStatus",
+    "RepeaterUse",
     "TetraParams",
-    "UseName",
+    "Tone",
     "freq_to_band",
     "parse_tone",
     "repeater_spec_json_schema",
@@ -32,13 +33,21 @@ __all__: tuple[str, ...] = (
 )
 
 import json
-from datetime import date  # noqa: TC003
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, cast
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, computed_field
+
+from repeaterbook.utils import (
+    CtcssToneHz,  # noqa: TC001
+    DistanceKm,  # noqa: TC001
+    FrequencyMHz,  # noqa: TC001
+    LatitudeDeg,  # noqa: TC001
+    LongitudeDeg,  # noqa: TC001
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -59,11 +68,29 @@ class RepeaterMode(StrEnum):
     M17 = "M17"
 
 
-# Wire uses the *names* of the core Status/Use enums (e.g. "ON_AIR", "OPEN").
-# Typing these as the enums themselves would serialize their integer auto()
-# values instead; test_status_use_literals_match_enums guards against drift.
-StatusName: TypeAlias = Literal["OFF_AIR", "ON_AIR", "UNKNOWN"]
-UseName: TypeAlias = Literal["OPEN", "PRIVATE", "CLOSED"]
+class RepeaterStatus(StrEnum):
+    """Whether a repeater is currently on the air.
+
+    Mirrors `repeaterbook.models.Status`, but as a StrEnum so the member name
+    *is* the wire value. `Status` uses `auto()`, whose integer values would
+    otherwise leak into the published contract.
+    """
+
+    OFF_AIR = "OFF_AIR"
+    ON_AIR = "ON_AIR"
+    UNKNOWN = "UNKNOWN"
+
+
+class RepeaterUse(StrEnum):
+    """Who may use a repeater.
+
+    Mirrors `repeaterbook.models.Use`; see `RepeaterStatus` for why this is a
+    separate StrEnum rather than a reuse of the core enum.
+    """
+
+    OPEN = "OPEN"
+    PRIVATE = "PRIVATE"
+    CLOSED = "CLOSED"
 
 
 class _Params(BaseModel):
@@ -138,19 +165,20 @@ class RepeaterSpec(BaseModel):
     name: str
     callsign: str | None
     nearest_city: str
-    rx_frequency_mhz: Decimal
-    tx_frequency_mhz: Decimal
-    ctcss_tx_hz: Decimal | None
-    ctcss_rx_hz: Decimal | None
-    dcs_code: str | None
-    latitude: Decimal
-    longitude: Decimal
-    distance_km: float | None
-    operational_status: StatusName
-    use: UseName
+    rx_frequency_mhz: FrequencyMHz
+    tx_frequency_mhz: FrequencyMHz
+    ctcss_tx_hz: CtcssToneHz
+    ctcss_rx_hz: CtcssToneHz
+    dcs_tx_code: str | None
+    dcs_rx_code: str | None
+    latitude: LatitudeDeg
+    longitude: LongitudeDeg
+    distance_km: DistanceKm | None
+    operational_status: RepeaterStatus
+    use: RepeaterUse
     band: str | None
     notes: str | None
-    last_update: date
+    last_update: datetime
     source: str = "repeaterbook"
     source_id: str
     params: Params
@@ -191,28 +219,35 @@ def write_schema() -> None:
     )
 
 
-def parse_tone(raw: str | None) -> tuple[Decimal | None, str | None]:
-    """Split a RepeaterBook tone string into (ctcss_hz, dcs_code).
+class Tone(NamedTuple):
+    """A squelch tone for one signal direction: at most one of CTCSS or DCS."""
+
+    ctcss: CtcssToneHz
+    dcs: str | None
+
+
+def parse_tone(raw: str | None) -> Tone:
+    """Split a RepeaterBook tone string into its CTCSS and DCS parts.
 
     RepeaterBook mixes CTCSS frequencies and DCS codes in one string field.
     Rule: "." -> CTCSS Decimal; "D"/"d" prefix -> DCS (letter stripped+uppercased);
-    all-digits -> DCS; else (None, None).
+    all-digits -> DCS; else an empty Tone.
     """
     if raw is None or not (value := raw.strip()):
-        return (None, None)
+        return Tone(None, None)
     if "." in value:
         try:
-            return (Decimal(value), None)
+            return Tone(Decimal(value), None)
         except InvalidOperation:
-            return (None, None)
+            return Tone(None, None)
     if value[0] in {"D", "d"}:
-        return (None, value[1:].upper())
+        return Tone(None, value[1:].upper())
     if value.isdigit():
-        return (None, value)
-    return (None, None)
+        return Tone(None, value)
+    return Tone(None, None)
 
 
-def freq_to_band(freq: Decimal) -> str | None:
+def freq_to_band(freq: FrequencyMHz) -> str | None:
     """Return the amateur band name for a frequency, or None if unknown."""
     # Lazy import: breaks a models<->spec import cycle.
     from repeaterbook.queries import Bands  # noqa: PLC0415
@@ -254,15 +289,12 @@ _DEFAULT_PARAMS: dict[RepeaterMode, type[_ParamsUnion]] = {
 
 def repeater_to_specs(
     rep: Repeater,
-    distance_km: float | None = None,
+    distance_km: Decimal | None = None,
 ) -> list[RepeaterSpec]:
     """Expand one repeater into one spec per supported mode."""
-    ctcss_tx, dcs_tx = parse_tone(rep.pl_ctcss_uplink)
-    ctcss_rx, dcs_rx = parse_tone(rep.pl_ctcss_tsq_downlink)
+    uplink = parse_tone(rep.pl_ctcss_uplink)
+    downlink = parse_tone(rep.pl_ctcss_tsq_downlink)
     modes = rep.modes or frozenset({RepeaterMode.FM})
-    # rep.operational_status.name / rep.use_membership.name are plain `str` to
-    # mypy; the casts to the narrower Literal aliases are safe because
-    # test_status_use_literals_match_enums guards them against enum drift.
     return [
         RepeaterSpec(
             name=rep.callsign or rep.location_nearest_city,
@@ -270,17 +302,18 @@ def repeater_to_specs(
             nearest_city=rep.location_nearest_city,
             rx_frequency_mhz=rep.frequency,
             tx_frequency_mhz=rep.input_frequency,
-            ctcss_tx_hz=ctcss_tx,
-            ctcss_rx_hz=ctcss_rx,
-            dcs_code=dcs_tx or dcs_rx,
+            ctcss_tx_hz=uplink.ctcss,
+            ctcss_rx_hz=downlink.ctcss,
+            dcs_tx_code=uplink.dcs,
+            dcs_rx_code=downlink.dcs,
             latitude=rep.latitude,
             longitude=rep.longitude,
             distance_km=distance_km,
-            operational_status=cast("StatusName", rep.operational_status.name),
-            use=cast("UseName", rep.use_membership.name),
+            operational_status=RepeaterStatus[rep.operational_status.name],
+            use=RepeaterUse[rep.use_membership.name],
             band=freq_to_band(rep.frequency),
             notes=rep.notes,
-            last_update=rep.last_update,
+            last_update=datetime.combine(rep.last_update, datetime.min.time()),
             source_id=f"{rep.state_id}:{rep.repeater_id}",
             params=_ACCESSOR[mode](rep) or _DEFAULT_PARAMS[mode](),
         )

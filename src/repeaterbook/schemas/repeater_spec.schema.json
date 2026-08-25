@@ -1,5 +1,21 @@
 {
   "$defs": {
+    "CtcssToneHz": {
+      "anyOf": [
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "CTCSS tone frequency in hertz for one signal direction. Null means CTCSS is disabled for that direction. Use a decimal string to preserve exactness; increments are 0.1 Hz.",
+      "examples": [
+        "88.5"
+      ],
+      "unit": "Hz"
+    },
     "DStarParams": {
       "additionalProperties": false,
       "description": "RepeaterBook carries no D-STAR parameters; intentionally empty.",
@@ -13,6 +29,15 @@
       },
       "title": "DStarParams",
       "type": "object"
+    },
+    "DistanceKm": {
+      "description": "Non-negative distance in kilometers. Use a decimal string to preserve exactness.",
+      "examples": [
+        "12.345"
+      ],
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "type": "string",
+      "unit": "km"
     },
     "DmrParams": {
       "additionalProperties": false,
@@ -77,6 +102,16 @@
       "title": "FmParams",
       "type": "object"
     },
+    "FrequencyMHz": {
+      "description": "Positive radio frequency in megahertz. Use a decimal string to preserve exactness; increments are 0.000001 MHz (1 Hz).",
+      "examples": [
+        "145.550000",
+        "438.500000"
+      ],
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "type": "string",
+      "unit": "MHz"
+    },
     "FusionParams": {
       "additionalProperties": false,
       "properties": {
@@ -125,6 +160,24 @@
       },
       "title": "FusionParams",
       "type": "object"
+    },
+    "LatitudeDeg": {
+      "description": "Latitude in decimal degrees from -90 to 90. Positive values are north and negative values are south. Use a decimal string to preserve exactness.",
+      "examples": [
+        "-23.550520"
+      ],
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "type": "string",
+      "unit": "deg"
+    },
+    "LongitudeDeg": {
+      "description": "Longitude in decimal degrees from -180 to 180. Positive values are east and negative values are west. Use a decimal string to preserve exactness.",
+      "examples": [
+        "-46.633308"
+      ],
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "type": "string",
+      "unit": "deg"
     },
     "M17Params": {
       "additionalProperties": false,
@@ -205,6 +258,26 @@
       "title": "RepeaterMode",
       "type": "string"
     },
+    "RepeaterStatus": {
+      "description": "Whether a repeater is currently on the air.\n\nMirrors `repeaterbook.models.Status`, but as a StrEnum so the member name\n*is* the wire value. `Status` uses `auto()`, whose integer values would\notherwise leak into the published contract.",
+      "enum": [
+        "OFF_AIR",
+        "ON_AIR",
+        "UNKNOWN"
+      ],
+      "title": "RepeaterStatus",
+      "type": "string"
+    },
+    "RepeaterUse": {
+      "description": "Who may use a repeater.\n\nMirrors `repeaterbook.models.Use`; see `RepeaterStatus` for why this is a\nseparate StrEnum rather than a reuse of the core enum.",
+      "enum": [
+        "OPEN",
+        "PRIVATE",
+        "CLOSED"
+      ],
+      "title": "RepeaterUse",
+      "type": "string"
+    },
     "TetraParams": {
       "additionalProperties": false,
       "properties": {
@@ -265,40 +338,18 @@
       "type": "string"
     },
     "rx_frequency_mhz": {
-      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-      "title": "Rx Frequency Mhz",
-      "type": "string"
+      "$ref": "#/$defs/FrequencyMHz"
     },
     "tx_frequency_mhz": {
-      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-      "title": "Tx Frequency Mhz",
-      "type": "string"
+      "$ref": "#/$defs/FrequencyMHz"
     },
     "ctcss_tx_hz": {
-      "anyOf": [
-        {
-          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Ctcss Tx Hz"
+      "$ref": "#/$defs/CtcssToneHz"
     },
     "ctcss_rx_hz": {
-      "anyOf": [
-        {
-          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Ctcss Rx Hz"
+      "$ref": "#/$defs/CtcssToneHz"
     },
-    "dcs_code": {
+    "dcs_tx_code": {
       "anyOf": [
         {
           "type": "string"
@@ -307,46 +358,40 @@
           "type": "null"
         }
       ],
-      "title": "Dcs Code"
+      "title": "Dcs Tx Code"
+    },
+    "dcs_rx_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Dcs Rx Code"
     },
     "latitude": {
-      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-      "title": "Latitude",
-      "type": "string"
+      "$ref": "#/$defs/LatitudeDeg"
     },
     "longitude": {
-      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-      "title": "Longitude",
-      "type": "string"
+      "$ref": "#/$defs/LongitudeDeg"
     },
     "distance_km": {
       "anyOf": [
         {
-          "type": "number"
+          "$ref": "#/$defs/DistanceKm"
         },
         {
           "type": "null"
         }
-      ],
-      "title": "Distance Km"
+      ]
     },
     "operational_status": {
-      "enum": [
-        "OFF_AIR",
-        "ON_AIR",
-        "UNKNOWN"
-      ],
-      "title": "Operational Status",
-      "type": "string"
+      "$ref": "#/$defs/RepeaterStatus"
     },
     "use": {
-      "enum": [
-        "OPEN",
-        "PRIVATE",
-        "CLOSED"
-      ],
-      "title": "Use",
-      "type": "string"
+      "$ref": "#/$defs/RepeaterUse"
     },
     "band": {
       "anyOf": [
@@ -371,7 +416,7 @@
       "title": "Notes"
     },
     "last_update": {
-      "format": "date",
+      "format": "date-time",
       "title": "Last Update",
       "type": "string"
     },
@@ -440,7 +485,8 @@
     "tx_frequency_mhz",
     "ctcss_tx_hz",
     "ctcss_rx_hz",
-    "dcs_code",
+    "dcs_tx_code",
+    "dcs_rx_code",
     "latitude",
     "longitude",
     "distance_km",
