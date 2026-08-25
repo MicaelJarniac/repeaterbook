@@ -1,4 +1,4 @@
-"""Python utility to work with data from RepeaterBook."""
+"""Unofficial third-party Python client for the RepeaterBook.com API."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ __all__: tuple[str, ...] = (
     "RepeaterBookAPIError",
     "RepeaterBookCacheError",
     "RepeaterBookError",
+    "RepeaterBookForbiddenError",
+    "RepeaterBookRateLimitError",
     "RepeaterBookUnauthorizedError",
     "RepeaterBookValidationError",
     "__version__",
@@ -20,6 +22,8 @@ from repeaterbook.exceptions import (
     RepeaterBookAPIError,
     RepeaterBookCacheError,
     RepeaterBookError,
+    RepeaterBookForbiddenError,
+    RepeaterBookRateLimitError,
     RepeaterBookUnauthorizedError,
     RepeaterBookValidationError,
 )

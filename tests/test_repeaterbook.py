@@ -21,6 +21,8 @@ class TestPublicAPI:
         assert hasattr(repeaterbook, "RepeaterBookError")
         assert hasattr(repeaterbook, "RepeaterBookAPIError")
         assert hasattr(repeaterbook, "RepeaterBookCacheError")
+        assert hasattr(repeaterbook, "RepeaterBookForbiddenError")
+        assert hasattr(repeaterbook, "RepeaterBookRateLimitError")
         assert hasattr(repeaterbook, "RepeaterBookValidationError")
 
     def test_all_exports_match(self) -> None:

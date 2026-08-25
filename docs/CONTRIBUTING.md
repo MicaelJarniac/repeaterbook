@@ -1,6 +1,6 @@
-# Contributing to RepeaterBook
+# Contributing to RepeaterBook Python Client
 
-✨ Thanks for contributing to **RepeaterBook**! ✨
+✨ Thanks for contributing to the **RepeaterBook Python Client**! ✨
 
 As a contributor, here are the guidelines we would like you to follow:
 - [Code of conduct](#code-of-conduct)
@@ -16,13 +16,13 @@ We also recommend that you read [How to Contribute to Open Source](https://opens
 
 ## Code of conduct
 
-Help us keep **RepeaterBook** open and inclusive. Please read and follow our [Code of conduct](CODE_OF_CONDUCT.md).
+Help us keep the **RepeaterBook Python Client** open and inclusive. Please read and follow our [Code of conduct](CODE_OF_CONDUCT.md).
 
 ## How can I contribute?
 
 ### Improve documentation
 
-As a **RepeaterBook** user, you are the perfect candidate to help us improve our documentation: typo corrections, clarifications, more examples, etc. Take a look at the [documentation issues that need help](https://github.com/MicaelJarniac/repeaterbook/issues?q=is%3Aopen+label%3Adocumentation+label%3A"help+wanted").
+As a **RepeaterBook Python Client** user, you are the perfect candidate to help us improve our documentation: typo corrections, clarifications, more examples, etc. Take a look at the [documentation issues that need help](https://github.com/MicaelJarniac/repeaterbook/issues?q=is%3Aopen+label%3Adocumentation+label%3A"help+wanted").
 
 Please follow the [Documentation guidelines](#documentation).
 
@@ -95,10 +95,10 @@ To ensure consistency and quality throughout the source code, all code modificat
 ### Documentation
 
 To ensure consistency and quality, all documentation modifications must:
-- Refer to brand in [bold](https://help.github.com/articles/basic-writing-and-formatting-syntax/#styling-text) with proper capitalization, i.e. **GitHub**, **RepeaterBook**
+- Refer to brand in [bold](https://help.github.com/articles/basic-writing-and-formatting-syntax/#styling-text) with proper capitalization, i.e. **GitHub**, **RepeaterBook.com**
 - Prefer [tables](https://help.github.com/articles/organizing-information-with-tables) over [lists](https://help.github.com/articles/basic-writing-and-formatting-syntax/#lists) when listing key values, i.e. List of options with their description
 - Use [links](https://help.github.com/articles/basic-writing-and-formatting-syntax/#links) when you are referring to:
-  - a **RepeaterBook** concept described somewhere else in the documentation, i.e. How to [contribute](CONTRIBUTING.md)
+  - a **RepeaterBook Python Client** concept described somewhere else in the documentation, i.e. How to [contribute](CONTRIBUTING.md)
   - a third-party product/brand/service, i.e. Integrate with [GitHub](https://github.com)
   - an external concept or feature, i.e. Create a [GitHub release](https://help.github.com/articles/creating-releases)
   - a package or module, i.e. The [`@MicaelJarniac/repeaterbook`](https://github.com/MicaelJarniac/repeaterbook) module

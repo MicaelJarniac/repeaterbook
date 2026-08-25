@@ -1,6 +1,9 @@
 # Examples
 
-Real-world examples of using **RepeaterBook** for common amateur radio tasks.
+Real-world examples of using the **RepeaterBook Python Client** for common amateur radio tasks.
+
+!!! note "API token required"
+    As of RepeaterBook's [2026-03-03 API policy](https://repeaterbook.com/wiki/doku.php?id=api), the API requires a per-user `rbuapp_...` token. For brevity, the examples below construct `RepeaterBookAPI()` without arguments — in practice, set the `REPEATERBOOK` environment variable and pass your token via `RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])`. See the [Authentication guide](usage.md#authentication).
 
 ## Example 1: Build a Repeater Directory Website
 
@@ -115,7 +118,7 @@ from repeaterbook.utils import LatLon, Radius
 import pycountry
 
 async def generate_codeplug():
-    """Generate DMR codeplug from RepeaterBook data."""
+    """Generate DMR codeplug from RepeaterBook.com data."""
 
     # Download California repeaters
     api = RepeaterBookAPI()

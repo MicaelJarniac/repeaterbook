@@ -1,6 +1,6 @@
 # Usage Guide
 
-This comprehensive guide covers all the features and capabilities of **RepeaterBook**.
+This comprehensive guide covers all the features and capabilities of the **RepeaterBook Python Client**.
 
 ## API Client
 
@@ -23,6 +23,28 @@ api = RepeaterBookAPI(
     max_count=5000,  # Expected max results (default: 3500)
 )
 ```
+
+#### Authentication
+
+As of RepeaterBook's [2026-03-03 API policy](https://www.repeaterbook.com/wiki/doku.php?id=api), the export endpoints require an approved per-user API token (an `rbuapp_...` token), sent via the `X-RB-App-Token` header. Pass your token with the `app_token` argument — typically loaded from an environment variable so it never ends up in source control:
+
+```python
+import os
+
+from repeaterbook.services import RepeaterBookAPI
+
+api = RepeaterBookAPI(
+    app_token=os.environ["REPEATERBOOK"],
+    app_name="my-app",
+    app_version="1.0.0",
+    app_contact="you@example.org",
+)
+```
+
+The `app_name`, `app_version`, and `app_contact` values form the `User-Agent` that RepeaterBook uses to identify your application; provide accurate values, as generic or mismatched user agents may be rejected.
+
+!!! warning "Never share or distribute a token"
+    This library is a *distributed* client: each user must request and use their own `rbuapp_...` token. Do not embed a shared `app_...` token in source code, installers, or public repositories.
 
 #### Downloading Repeater Data
 
@@ -67,7 +89,7 @@ repeaters = asyncio.run(download_example())
 
 #### Caching
 
-The API client automatically caches responses to reduce load on the RepeaterBook servers and improve performance:
+The API client automatically caches responses to reduce load on RepeaterBook.com's servers and improve performance:
 
 - Default cache directory: `.repeaterbook_cache/`
 - Default cache TTL: 3600 seconds (1 hour)
@@ -712,7 +734,7 @@ results3 = rb.query(Repeater.dmr_capable == True)
 
 ## Error Handling
 
-RepeaterBook provides custom exceptions for robust error handling:
+The RepeaterBook Python Client provides custom exceptions for robust error handling:
 
 ```python
 from repeaterbook import (
@@ -760,7 +782,7 @@ The `Repeater` model includes built-in validation:
 
 ## Logging
 
-RepeaterBook uses `loguru` for logging:
+The RepeaterBook Python Client uses `loguru` for logging:
 
 ```python
 from loguru import logger

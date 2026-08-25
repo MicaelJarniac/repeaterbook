@@ -1,10 +1,10 @@
 # Architecture
 
-This document explains the internal architecture of **RepeaterBook** and how the different components work together.
+This document explains the internal architecture of the **RepeaterBook Python Client** and how the different components work together.
 
 ## Overview
 
-RepeaterBook is structured into several key modules:
+The RepeaterBook Python Client is structured into several key modules:
 
 ```
 repeaterbook/

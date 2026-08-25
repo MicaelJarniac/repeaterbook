@@ -1,6 +1,6 @@
 # API Reference
 
-This page provides detailed API documentation for RepeaterBook.
+This page provides detailed API documentation for the RepeaterBook Python Client.
 
 ## Main Module
 

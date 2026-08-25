@@ -74,11 +74,13 @@
 [code-of-conduct]: CODE_OF_CONDUCT.md
 <!---->
 
-# RepeaterBook
+# RepeaterBook Python Client
 
-Welcome to **RepeaterBook's** documentation!
+> **Unofficial project.** RepeaterBook Python Client is an independent, community-maintained library and is **not affiliated with, endorsed by, or officially supported by RepeaterBook.com**. "RepeaterBook" is a trademark of its respective owner. For the official website and API, visit <https://repeaterbook.com/>.
 
-**RepeaterBook** is a Python library that provides a powerful and convenient interface to [RepeaterBook.com](https://www.repeaterbook.com/), the world's largest database of amateur radio repeaters. With this library, you can programmatically download, query, and analyze repeater data for various amateur radio applications.
+Welcome to the **RepeaterBook Python Client** documentation!
+
+**RepeaterBook Python Client** is an unofficial, third-party Python library that provides a powerful and convenient interface to the [RepeaterBook.com](https://repeaterbook.com/) API — the world's largest database of amateur radio repeaters. With this library, you can programmatically download, query, and analyze repeater data for various amateur radio applications.
 
 ## Features
 
@@ -93,8 +95,11 @@ Welcome to **RepeaterBook's** documentation!
 
 ## Quick Example
 
+> This library requires a per-user RepeaterBook API token. [Request access](https://repeaterbook.com/wiki/doku.php?id=api), generate your token, and expose it as the `REPEATERBOOK` environment variable (for example `export REPEATERBOOK="rbuapp_..."`).
+
 ```python
 import asyncio
+import os
 from repeaterbook import RepeaterBook, Repeater
 from repeaterbook.services import RepeaterBookAPI
 from repeaterbook.models import ExportQuery, Status
@@ -104,7 +109,7 @@ import pycountry
 
 async def find_nearby_repeaters():
     # Download repeater data
-    api = RepeaterBookAPI()
+    api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
     brazil = pycountry.countries.get(name="Brazil")
     repeaters = await api.download(query=ExportQuery(countries={brazil}))
 
@@ -145,7 +150,7 @@ asyncio.run(find_nearby_repeaters())
 
 [Read the full documentation][docs]
 
-Read RepeaterBook's official [API documentation](https://www.repeaterbook.com/wiki/doku.php?id=api) for more information about the upstream API.
+Read RepeaterBook.com's official [API documentation](https://repeaterbook.com/wiki/doku.php?id=api) for more information about the upstream API.
 
 ## Use Cases
 
