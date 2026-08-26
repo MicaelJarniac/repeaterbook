@@ -3130,6 +3130,9 @@ linting = [
 pre-commit = [
     { name = "pre-commit" },
 ]
+release = [
+    { name = "python-semantic-release" },
+]
 tests = [
     { name = "coverage" },
     { name = "hypothesis" },
@@ -3213,6 +3216,7 @@ docs = [
 ]
 linting = [{ name = "ruff", specifier = ">=0.9.6" }]
 pre-commit = [{ name = "pre-commit", specifier = ">=4.1.0" }]
+release = [{ name = "python-semantic-release", specifier = ">=10.6.1" }]
 tests = [
     { name = "coverage", specifier = ">=7.6.11" },
     { name = "hypothesis", specifier = ">=6.125.3" },

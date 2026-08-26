@@ -92,6 +92,9 @@ linting = [
 pre-commit = [
     "pre-commit>=4.1.0",
 ]
+release = [
+    "python-semantic-release>=10.6.1",
+]
 automation = [
     "nox[uv]>=2025.2.9",
 ]
@@ -103,8 +106,8 @@ dev = [
     {include-group = "linting"},
     {include-group = "pre-commit"},
     {include-group = "automation"},
+    {include-group = "release"},
     "ipython>=8.18.1",
-    "python-semantic-release>=10.6.1",
     "pandas>=2.2.3",
     "ipykernel>=6.29.5",
     "rich>=13.9.4",
