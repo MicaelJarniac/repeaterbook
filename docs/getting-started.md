@@ -16,7 +16,7 @@ The **RepeaterBook Python Client** is an unofficial, third-party Python library 
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - pip, uv, or Poetry for package management
 
 ### Install from PyPI

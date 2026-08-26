@@ -1,21 +1,41 @@
 [project]
 name = "repeaterbook"
 version = "0.8.2"
-description = "Unofficial third-party Python client for the RepeaterBook.com API."
+description = "Unofficial third-party Python client and MCP server for the RepeaterBook.com API."
 authors = [
   {name = "Micael Jarniac", email = "micael@jarniac.dev"},
 ]
 license = {text = "MIT"}
 readme = "docs/README.md"
+keywords = [
+  "repeaterbook",
+  "ham-radio",
+  "amateur-radio",
+  "repeater",
+  "mcp",
+  "model-context-protocol",
+  "fastmcp",
+  "dmr",
+]
 classifiers = [
   # Get more from http://pypi.python.org/pypi?%3Aaction=list_classifiers
-  "Development Status :: 1 - Planning",
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
   "Natural Language :: English",
   "Operating System :: OS Independent",
+  "Topic :: Communications :: Ham Radio",
+  "Topic :: Software Development :: Libraries :: Python Modules",
   "Typing :: Typed",
   # https://github.com/astral-sh/uv/issues/8716
   "License :: OSI Approved :: MIT License",
+  # Keep in sync with `requires-python` and `.python-versions`.
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
 
 requires-python = ">=3.11"  # py_ver

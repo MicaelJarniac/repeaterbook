@@ -76,15 +76,16 @@
 
 # RepeaterBook Python Client
 
-> **Unofficial project.** RepeaterBook Python Client is an independent, community-maintained library and is **not affiliated with, endorsed by, or officially supported by RepeaterBook.com**. "RepeaterBook" is a trademark of its respective owner. For the official website and API, visit <https://repeaterbook.com/>.
+> **Unofficial project.** RepeaterBook Python Client is an independent, community-maintained library and MCP server, and is **not affiliated with, endorsed by, or officially supported by RepeaterBook.com**. "RepeaterBook" is a trademark of its respective owner. For the official website and API, visit <https://repeaterbook.com/>.
 
 Welcome to the **RepeaterBook Python Client** documentation!
 
-**RepeaterBook Python Client** is an unofficial, third-party Python library that provides a powerful and convenient interface to the [RepeaterBook.com](https://repeaterbook.com/) API — the world's largest database of amateur radio repeaters. With this library, you can programmatically download, query, and analyze repeater data for various amateur radio applications.
+**RepeaterBook Python Client** is an unofficial, third-party Python library **and [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server** that provides a powerful and convenient interface to the [RepeaterBook.com](https://repeaterbook.com/) API — the world's largest database of amateur radio repeaters. Use it as a library to programmatically download, query, and analyze repeater data, or run the bundled MCP server to give AI agents and LLM tools the same repeater lookup capabilities.
 
 ## Features
 
 - **Easy API Access**: Download repeater data from RepeaterBook.com with a simple async interface
+- **Unofficial MCP Server**: Ship repeater sync, geographic search, and lookup to any MCP client as three typed tools — see the [MCP Server guide](mcp.md)
 - **Local Database**: Store repeater information in a local SQLite database for fast queries
 - **Geographic Queries**: Find repeaters near a location using distance-based filtering
 - **Band Filtering**: Query repeaters by frequency band (2m, 70cm, etc.)
@@ -139,10 +140,38 @@ async def find_nearby_repeaters():
 asyncio.run(find_nearby_repeaters())
 ```
 
+## Quick Example (MCP)
+
+Prefer to drive RepeaterBook from an AI agent? The unofficial MCP server ships as
+the `repeaterbook-mcp` console script behind the `mcp` extra. Point your MCP
+client at `uvx` and nothing needs installing up front:
+
+```json
+{
+  "mcpServers": {
+    "repeaterbook": {
+      "command": "uvx",
+      "args": ["--from", "repeaterbook[mcp]", "repeaterbook-mcp"],
+      "env": {
+        "REPEATERBOOK_WORKING_DIR": "~/.repeaterbook",
+        "REPEATERBOOK_APP_CONTACT": "you@example.com",
+        "REPEATERBOOK_APP_TOKEN": "rbuapp_..."
+      }
+    }
+  }
+}
+```
+
+That exposes three tools — `sync_repeaters`, `search_repeaters`, and
+`get_repeater` — returning a stable, source-agnostic repeater spec. See the
+**[MCP Server guide](mcp.md)** for the full tool reference, filter vocabulary,
+and configuration options.
+
 ## Documentation
 
 - **[Getting Started](getting-started.md)** - Tutorial for beginners
 - **[Usage Guide](usage.md)** - Comprehensive usage examples
+- **[MCP Server](mcp.md)** - Run the unofficial MCP server for AI agents
 - **[Examples](examples.md)** - Real-world use cases
 - **[Architecture](architecture.md)** - Understanding the internals
 - **[API Reference](api.md)** - Complete API documentation
@@ -154,6 +183,7 @@ Read RepeaterBook.com's official [API documentation](https://repeaterbook.com/wi
 
 ## Use Cases
 
+- **AI Agents & Assistants**: Let an LLM look up repeaters conversationally over MCP
 - **Trip Planning**: Find repeaters along travel routes
 - **Emergency Communications**: Identify emergency-capable repeaters
 - **Radio Programming**: Generate codeplugs for DMR and other digital radios
@@ -190,6 +220,23 @@ pip install repeaterbook
 poetry add repeaterbook
 ```
 
+### MCP server
+
+The MCP server lives behind the `mcp` extra. Most MCP clients should invoke it
+via `uvx`, with no install step at all:
+
+```bash
+# Run on demand, no install (what MCP clients should use)
+uvx --from "repeaterbook[mcp]" repeaterbook-mcp
+
+# Or install it persistently
+uv tool install "repeaterbook[mcp]"
+
+# Or add it as a project dependency
+uv add "repeaterbook[mcp]"
+pip install "repeaterbook[mcp]"
+```
+
 ### GitHub
 
 You can also install the latest version of the code directly from GitHub:
@@ -207,14 +254,19 @@ poetry add git+https://github.com/MicaelJarniac/repeaterbook
 
 ## Requirements
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - Dependencies are automatically installed:
   - aiohttp - Async HTTP client
-  - sqlmodel - SQL ORM with type safety
+  - anyio - Async compatibility layer
+  - attrs - Immutable config classes
   - haversine - Distance calculations
-  - pycountry - Country/region codes
   - loguru - Structured logging
+  - pycountry - Country/region codes
+  - pydantic - Data validation
+  - sqlmodel - SQL ORM with type safety
   - tqdm - Progress bars
+  - yarl - URL handling
+- The optional `mcp` extra additionally installs `fastmcp` and `pydantic-settings`
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
