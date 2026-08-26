@@ -67,7 +67,7 @@
 [badge-license]: https://img.shields.io/github/license/MicaelJarniac/repeaterbook?style=flat-square
 [license]: https://github.com/MicaelJarniac/repeaterbook/blob/main/LICENSE
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[badge-all-contributors]: https://img.shields.io/badge/all_contributors-0-orange.svg?style=flat-square
+[badge-all-contributors]: https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 [contributors]: #Contributors-✨
 [badge-code-of-conduct]: https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa?style=flat-square
@@ -228,6 +228,11 @@ More details can be found in [CONTRIBUTING](CONTRIBUTING.md).
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
 <table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/adamancini"><img src="https://avatars.githubusercontent.com/u/292598?v=4?s=100" width="100px;" alt="ada mancini"/><br /><sub><b>ada mancini</b></sub></a><br /><a href="https://github.com/MicaelJarniac/repeaterbook/issues?q=author%3Aadamancini" title="Bug reports">🐛</a> <a href="#ideas-adamancini" title="Ideas, Planning, & Feedback">🤔</a> <a href="#userTesting-adamancini" title="User Testing">📓</a></td>
+    </tr>
+  </tbody>
 </table>
 
 <!-- markdownlint-restore -->
