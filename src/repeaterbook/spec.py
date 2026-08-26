@@ -1,0 +1,321 @@
+"""Neutral, source-agnostic repeater-spec contract and its mapper.
+
+One RepeaterSpec is one programmable radio channel. A multi-mode repeater
+expands to one spec per mode. `params` is a union discriminated on its own
+`mode` field, and `extra="forbid"` on each params model is what makes a
+mode/params mismatch illegal by construction. `RepeaterSpec.mode` re-exposes
+`params.mode` at the top level, so the two can never disagree.
+"""
+
+from __future__ import annotations
+
+__all__: tuple[str, ...] = (
+    "DStarParams",
+    "DmrParams",
+    "FmParams",
+    "FusionParams",
+    "M17Params",
+    "NxdnParams",
+    "P25Params",
+    "Params",
+    "RepeaterMode",
+    "RepeaterSpec",
+    "RepeaterStatus",
+    "RepeaterUse",
+    "TetraParams",
+    "Tone",
+    "freq_to_band",
+    "parse_tone",
+    "repeater_spec_json_schema",
+    "repeater_to_specs",
+    "schema_path",
+    "write_schema",
+)
+
+import json
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+from enum import StrEnum
+from pathlib import Path
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeAlias
+
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, computed_field
+
+from repeaterbook.utils import (
+    CtcssToneHz,  # noqa: TC001
+    DistanceKm,  # noqa: TC001
+    FrequencyMHz,  # noqa: TC001
+    LatitudeDeg,  # noqa: TC001
+    LongitudeDeg,  # noqa: TC001
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from repeaterbook.models import Repeater
+
+
+class RepeaterMode(StrEnum):
+    """A single radio operating mode for one programmable channel."""
+
+    FM = "FM"
+    DMR = "DMR"
+    DSTAR = "DSTAR"
+    FUSION = "FUSION"
+    P25 = "P25"
+    NXDN = "NXDN"
+    TETRA = "TETRA"
+    M17 = "M17"
+
+
+class RepeaterStatus(StrEnum):
+    """Whether a repeater is currently on the air.
+
+    Mirrors `repeaterbook.models.Status`, but as a StrEnum so the member name
+    *is* the wire value. `Status` uses `auto()`, whose integer values would
+    otherwise leak into the published contract.
+    """
+
+    OFF_AIR = "OFF_AIR"
+    ON_AIR = "ON_AIR"
+    UNKNOWN = "UNKNOWN"
+
+
+class RepeaterUse(StrEnum):
+    """Who may use a repeater.
+
+    Mirrors `repeaterbook.models.Use`; see `RepeaterStatus` for why this is a
+    separate StrEnum rather than a reuse of the core enum.
+    """
+
+    OPEN = "OPEN"
+    PRIVATE = "PRIVATE"
+    CLOSED = "CLOSED"
+
+
+class _Params(BaseModel):
+    """Base for per-mode parameter blocks. Forbids unknown keys."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class FmParams(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.FM] = RepeaterMode.FM
+    bandwidth_khz: Decimal | None = None
+
+
+class DmrParams(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.DMR] = RepeaterMode.DMR
+    dmr_id: str | None = None
+    color_code: str | None = None
+
+
+class DStarParams(_Params):
+    """RepeaterBook carries no D-STAR parameters; intentionally empty."""
+
+    mode: Literal[RepeaterMode.DSTAR] = RepeaterMode.DSTAR
+
+
+class FusionParams(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.FUSION] = RepeaterMode.FUSION
+    digital_id_uplink: str | None = None
+    digital_id_downlink: str | None = None
+    dsc: str | None = None
+
+
+class P25Params(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.P25] = RepeaterMode.P25
+    nac: str | None = None
+
+
+class NxdnParams(_Params):
+    """RepeaterBook carries no NXDN parameters; intentionally empty."""
+
+    mode: Literal[RepeaterMode.NXDN] = RepeaterMode.NXDN
+
+
+class TetraParams(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.TETRA] = RepeaterMode.TETRA
+    mcc: str | None = None
+    mnc: str | None = None
+
+
+class M17Params(_Params):  # noqa: D101 -- docstring would leak into the committed JSON Schema
+    mode: Literal[RepeaterMode.M17] = RepeaterMode.M17
+    can: str | None = None
+
+
+_ParamsUnion: TypeAlias = (
+    FmParams
+    | DmrParams
+    | DStarParams
+    | FusionParams
+    | P25Params
+    | NxdnParams
+    | TetraParams
+    | M17Params
+)
+
+Params: TypeAlias = Annotated[_ParamsUnion, Field(discriminator="mode")]
+
+
+class RepeaterSpec(BaseModel):
+    """One programmable radio channel; `params` is discriminated on its mode."""
+
+    name: str
+    callsign: str | None
+    nearest_city: str
+    rx_frequency_mhz: FrequencyMHz
+    tx_frequency_mhz: FrequencyMHz
+    ctcss_tx_hz: CtcssToneHz
+    ctcss_rx_hz: CtcssToneHz
+    dcs_tx_code: str | None
+    dcs_rx_code: str | None
+    latitude: LatitudeDeg
+    longitude: LongitudeDeg
+    distance_km: DistanceKm | None
+    operational_status: RepeaterStatus
+    use: RepeaterUse
+    band: str | None
+    notes: str | None
+    last_update: datetime
+    source: str = "repeaterbook"
+    source_id: str
+    params: Params
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def mode(self) -> RepeaterMode:
+        """The channel's mode, derived from `params` so the two cannot disagree."""
+        return self.params.mode
+
+
+_ADAPTER: TypeAdapter[RepeaterSpec] = TypeAdapter(RepeaterSpec)
+
+
+def repeater_spec_json_schema() -> dict[str, object]:
+    """Return the JSON Schema for RepeaterSpec, as it appears on the wire.
+
+    Generated in serialization mode on purpose: `mode` is a computed field, and
+    Pydantic emits computed fields only into the serialization schema. The
+    default validation mode would publish a contract missing the top-level
+    `mode` key that this model actually serializes.
+    """
+    return _ADAPTER.json_schema(mode="serialization")
+
+
+def schema_path() -> Path:
+    """Return the path to the published repeater-spec JSON Schema."""
+    return Path(__file__).parent / "schemas" / "repeater_spec.schema.json"
+
+
+def write_schema() -> None:
+    """Regenerate the published JSON Schema from the model."""
+    path = schema_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(repeater_spec_json_schema(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+class Tone(NamedTuple):
+    """A squelch tone for one signal direction: at most one of CTCSS or DCS."""
+
+    ctcss: CtcssToneHz
+    dcs: str | None
+
+
+def parse_tone(raw: str | None) -> Tone:
+    """Split a RepeaterBook tone string into its CTCSS and DCS parts.
+
+    RepeaterBook mixes CTCSS frequencies and DCS codes in one string field.
+    Rule: "." -> CTCSS Decimal; "D"/"d" prefix -> DCS (letter stripped+uppercased);
+    all-digits -> DCS; else an empty Tone.
+    """
+    if raw is None or not (value := raw.strip()):
+        return Tone(None, None)
+    if "." in value:
+        try:
+            return Tone(Decimal(value), None)
+        except InvalidOperation:
+            return Tone(None, None)
+    if value[0] in {"D", "d"}:
+        return Tone(None, value[1:].upper())
+    if value.isdigit():
+        return Tone(None, value)
+    return Tone(None, None)
+
+
+def freq_to_band(freq: FrequencyMHz) -> str | None:
+    """Return the amateur band name for a frequency, or None if unknown."""
+    # Lazy import: breaks a models<->spec import cycle.
+    from repeaterbook.queries import Bands  # noqa: PLC0415
+
+    for b in Bands:
+        if b.low <= freq <= b.high:
+            return b.name
+    return None
+
+
+# Maps a mode to the Repeater accessor returning that mode's params. Callables,
+# not attribute-name strings: mypy checks each accessor's return type and
+# rename-refactoring follows them.
+_ACCESSOR: dict[RepeaterMode, Callable[[Repeater], _ParamsUnion | None]] = {
+    RepeaterMode.FM: lambda r: r.fm,
+    RepeaterMode.DMR: lambda r: r.dmr,
+    RepeaterMode.DSTAR: lambda r: r.dstar,
+    RepeaterMode.FUSION: lambda r: r.fusion,
+    RepeaterMode.P25: lambda r: r.p25,
+    RepeaterMode.NXDN: lambda r: r.nxdn,
+    RepeaterMode.TETRA: lambda r: r.tetra,
+    RepeaterMode.M17: lambda r: r.m17,
+}
+
+# Fallback params per mode. `mode` is derived from `params`, so falling back to a
+# single shared default (e.g. always FmParams) would silently relabel a channel's
+# mode instead of failing. Keep these mode-correct.
+_DEFAULT_PARAMS: dict[RepeaterMode, type[_ParamsUnion]] = {
+    RepeaterMode.FM: FmParams,
+    RepeaterMode.DMR: DmrParams,
+    RepeaterMode.DSTAR: DStarParams,
+    RepeaterMode.FUSION: FusionParams,
+    RepeaterMode.P25: P25Params,
+    RepeaterMode.NXDN: NxdnParams,
+    RepeaterMode.TETRA: TetraParams,
+    RepeaterMode.M17: M17Params,
+}
+
+
+def repeater_to_specs(
+    rep: Repeater,
+    distance_km: Decimal | None = None,
+) -> list[RepeaterSpec]:
+    """Expand one repeater into one spec per supported mode."""
+    uplink = parse_tone(rep.pl_ctcss_uplink)
+    downlink = parse_tone(rep.pl_ctcss_tsq_downlink)
+    modes = rep.modes or frozenset({RepeaterMode.FM})
+    return [
+        RepeaterSpec(
+            name=rep.callsign or rep.location_nearest_city,
+            callsign=rep.callsign,
+            nearest_city=rep.location_nearest_city,
+            rx_frequency_mhz=rep.frequency,
+            tx_frequency_mhz=rep.input_frequency,
+            ctcss_tx_hz=uplink.ctcss,
+            ctcss_rx_hz=downlink.ctcss,
+            dcs_tx_code=uplink.dcs,
+            dcs_rx_code=downlink.dcs,
+            latitude=rep.latitude,
+            longitude=rep.longitude,
+            distance_km=distance_km,
+            operational_status=RepeaterStatus[rep.operational_status.name],
+            use=RepeaterUse[rep.use_membership.name],
+            band=freq_to_band(rep.frequency),
+            notes=rep.notes,
+            last_update=datetime.combine(rep.last_update, datetime.min.time()),
+            source_id=f"{rep.state_id}:{rep.repeater_id}",
+            params=_ACCESSOR[mode](rep) or _DEFAULT_PARAMS[mode](),
+        )
+        for mode in modes
+    ]

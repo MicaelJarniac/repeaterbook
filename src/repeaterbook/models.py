@@ -37,6 +37,18 @@ from pycountry.db import Country  # noqa: TC002
 from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
+from repeaterbook.spec import (
+    DmrParams,
+    DStarParams,
+    FmParams,
+    FusionParams,
+    M17Params,
+    NxdnParams,
+    P25Params,
+    RepeaterMode,
+    TetraParams,
+)
+
 # Core models
 
 
@@ -157,6 +169,73 @@ class Repeater(SQLModel, table=True):
             msg = f"Frequency must be positive, got {v}"
             raise ValueError(msg)
         return v
+
+    @property
+    def fm(self) -> FmParams | None:
+        """FM parameters, or None if not FM-capable."""
+        if not self.analog_capable:
+            return None
+        return FmParams(bandwidth_khz=self.fm_bandwidth)
+
+    @property
+    def dmr(self) -> DmrParams | None:
+        """DMR parameters, or None if not DMR-capable."""
+        if not self.dmr_capable:
+            return None
+        return DmrParams(dmr_id=self.dmr_id, color_code=self.dmr_color_code)
+
+    @property
+    def dstar(self) -> DStarParams | None:
+        """D-STAR parameters, or None if not D-STAR-capable."""
+        return DStarParams() if self.d_star_capable else None
+
+    @property
+    def fusion(self) -> FusionParams | None:
+        """System Fusion parameters, or None if not Fusion-capable."""
+        if not self.yaesu_system_fusion_capable:
+            return None
+        return FusionParams(
+            digital_id_uplink=self.ysf_digital_id_uplink,
+            digital_id_downlink=self.ysf_digital_id_downlink,
+            dsc=self.ysf_dsc,
+        )
+
+    @property
+    def p25(self) -> P25Params | None:
+        """P25 parameters, or None if not P25-capable."""
+        return P25Params(nac=self.p_25_nac) if self.apco_p_25_capable else None
+
+    @property
+    def nxdn(self) -> NxdnParams | None:
+        """NXDN parameters, or None if not NXDN-capable."""
+        return NxdnParams() if self.nxdn_capable else None
+
+    @property
+    def tetra(self) -> TetraParams | None:
+        """TETRA parameters, or None if not TETRA-capable."""
+        if not self.tetra_capable:
+            return None
+        return TetraParams(mcc=self.tetra_mcc, mnc=self.tetra_mnc)
+
+    @property
+    def m17(self) -> M17Params | None:
+        """M17 parameters, or None if not M17-capable."""
+        return M17Params(can=self.m17_can) if self.m17_capable else None
+
+    @property
+    def modes(self) -> frozenset[RepeaterMode]:
+        """The set of modes this repeater supports."""
+        pairs = (
+            (self.analog_capable, RepeaterMode.FM),
+            (self.dmr_capable, RepeaterMode.DMR),
+            (self.d_star_capable, RepeaterMode.DSTAR),
+            (self.yaesu_system_fusion_capable, RepeaterMode.FUSION),
+            (self.apco_p_25_capable, RepeaterMode.P25),
+            (self.nxdn_capable, RepeaterMode.NXDN),
+            (self.tetra_capable, RepeaterMode.TETRA),
+            (self.m17_capable, RepeaterMode.M17),
+        )
+        return frozenset(mode for capable, mode in pairs if capable)
 
 
 # JSON models

@@ -1,0 +1,504 @@
+{
+  "$defs": {
+    "CtcssToneHz": {
+      "anyOf": [
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "CTCSS tone frequency in hertz for one signal direction. Null means CTCSS is disabled for that direction. Use a decimal string to preserve exactness; increments are 0.1 Hz.",
+      "examples": [
+        "88.5"
+      ],
+      "unit": "Hz"
+    },
+    "DStarParams": {
+      "additionalProperties": false,
+      "description": "RepeaterBook carries no D-STAR parameters; intentionally empty.",
+      "properties": {
+        "mode": {
+          "const": "DSTAR",
+          "default": "DSTAR",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "DStarParams",
+      "type": "object"
+    },
+    "DistanceKm": {
+      "description": "Non-negative distance in kilometers. Use a decimal string to preserve exactness.",
+      "examples": [
+        "12.345"
+      ],
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "type": "string",
+      "unit": "km"
+    },
+    "DmrParams": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "DMR",
+          "default": "DMR",
+          "title": "Mode",
+          "type": "string"
+        },
+        "dmr_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dmr Id"
+        },
+        "color_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color Code"
+        }
+      },
+      "title": "DmrParams",
+      "type": "object"
+    },
+    "FmParams": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "FM",
+          "default": "FM",
+          "title": "Mode",
+          "type": "string"
+        },
+        "bandwidth_khz": {
+          "anyOf": [
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bandwidth Khz"
+        }
+      },
+      "title": "FmParams",
+      "type": "object"
+    },
+    "FrequencyMHz": {
+      "description": "Positive radio frequency in megahertz. Use a decimal string to preserve exactness; increments are 0.000001 MHz (1 Hz).",
+      "examples": [
+        "145.550000",
+        "438.500000"
+      ],
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "type": "string",
+      "unit": "MHz"
+    },
+    "FusionParams": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "FUSION",
+          "default": "FUSION",
+          "title": "Mode",
+          "type": "string"
+        },
+        "digital_id_uplink": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Digital Id Uplink"
+        },
+        "digital_id_downlink": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Digital Id Downlink"
+        },
+        "dsc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dsc"
+        }
+      },
+      "title": "FusionParams",
+      "type": "object"
+    },
+    "LatitudeDeg": {
+      "description": "Latitude in decimal degrees from -90 to 90. Positive values are north and negative values are south. Use a decimal string to preserve exactness.",
+      "examples": [
+        "-23.550520"
+      ],
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "type": "string",
+      "unit": "deg"
+    },
+    "LongitudeDeg": {
+      "description": "Longitude in decimal degrees from -180 to 180. Positive values are east and negative values are west. Use a decimal string to preserve exactness.",
+      "examples": [
+        "-46.633308"
+      ],
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "type": "string",
+      "unit": "deg"
+    },
+    "M17Params": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "M17",
+          "default": "M17",
+          "title": "Mode",
+          "type": "string"
+        },
+        "can": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Can"
+        }
+      },
+      "title": "M17Params",
+      "type": "object"
+    },
+    "NxdnParams": {
+      "additionalProperties": false,
+      "description": "RepeaterBook carries no NXDN parameters; intentionally empty.",
+      "properties": {
+        "mode": {
+          "const": "NXDN",
+          "default": "NXDN",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "NxdnParams",
+      "type": "object"
+    },
+    "P25Params": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "P25",
+          "default": "P25",
+          "title": "Mode",
+          "type": "string"
+        },
+        "nac": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nac"
+        }
+      },
+      "title": "P25Params",
+      "type": "object"
+    },
+    "RepeaterMode": {
+      "description": "A single radio operating mode for one programmable channel.",
+      "enum": [
+        "FM",
+        "DMR",
+        "DSTAR",
+        "FUSION",
+        "P25",
+        "NXDN",
+        "TETRA",
+        "M17"
+      ],
+      "title": "RepeaterMode",
+      "type": "string"
+    },
+    "RepeaterStatus": {
+      "description": "Whether a repeater is currently on the air.\n\nMirrors `repeaterbook.models.Status`, but as a StrEnum so the member name\n*is* the wire value. `Status` uses `auto()`, whose integer values would\notherwise leak into the published contract.",
+      "enum": [
+        "OFF_AIR",
+        "ON_AIR",
+        "UNKNOWN"
+      ],
+      "title": "RepeaterStatus",
+      "type": "string"
+    },
+    "RepeaterUse": {
+      "description": "Who may use a repeater.\n\nMirrors `repeaterbook.models.Use`; see `RepeaterStatus` for why this is a\nseparate StrEnum rather than a reuse of the core enum.",
+      "enum": [
+        "OPEN",
+        "PRIVATE",
+        "CLOSED"
+      ],
+      "title": "RepeaterUse",
+      "type": "string"
+    },
+    "TetraParams": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "TETRA",
+          "default": "TETRA",
+          "title": "Mode",
+          "type": "string"
+        },
+        "mcc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mcc"
+        },
+        "mnc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mnc"
+        }
+      },
+      "title": "TetraParams",
+      "type": "object"
+    }
+  },
+  "description": "One programmable radio channel; `params` is discriminated on its mode.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "callsign": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Callsign"
+    },
+    "nearest_city": {
+      "title": "Nearest City",
+      "type": "string"
+    },
+    "rx_frequency_mhz": {
+      "$ref": "#/$defs/FrequencyMHz"
+    },
+    "tx_frequency_mhz": {
+      "$ref": "#/$defs/FrequencyMHz"
+    },
+    "ctcss_tx_hz": {
+      "$ref": "#/$defs/CtcssToneHz"
+    },
+    "ctcss_rx_hz": {
+      "$ref": "#/$defs/CtcssToneHz"
+    },
+    "dcs_tx_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Dcs Tx Code"
+    },
+    "dcs_rx_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Dcs Rx Code"
+    },
+    "latitude": {
+      "$ref": "#/$defs/LatitudeDeg"
+    },
+    "longitude": {
+      "$ref": "#/$defs/LongitudeDeg"
+    },
+    "distance_km": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DistanceKm"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "operational_status": {
+      "$ref": "#/$defs/RepeaterStatus"
+    },
+    "use": {
+      "$ref": "#/$defs/RepeaterUse"
+    },
+    "band": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Band"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Notes"
+    },
+    "last_update": {
+      "format": "date-time",
+      "title": "Last Update",
+      "type": "string"
+    },
+    "source": {
+      "default": "repeaterbook",
+      "title": "Source",
+      "type": "string"
+    },
+    "source_id": {
+      "title": "Source Id",
+      "type": "string"
+    },
+    "params": {
+      "discriminator": {
+        "mapping": {
+          "DMR": "#/$defs/DmrParams",
+          "DSTAR": "#/$defs/DStarParams",
+          "FM": "#/$defs/FmParams",
+          "FUSION": "#/$defs/FusionParams",
+          "M17": "#/$defs/M17Params",
+          "NXDN": "#/$defs/NxdnParams",
+          "P25": "#/$defs/P25Params",
+          "TETRA": "#/$defs/TetraParams"
+        },
+        "propertyName": "mode"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FmParams"
+        },
+        {
+          "$ref": "#/$defs/DmrParams"
+        },
+        {
+          "$ref": "#/$defs/DStarParams"
+        },
+        {
+          "$ref": "#/$defs/FusionParams"
+        },
+        {
+          "$ref": "#/$defs/P25Params"
+        },
+        {
+          "$ref": "#/$defs/NxdnParams"
+        },
+        {
+          "$ref": "#/$defs/TetraParams"
+        },
+        {
+          "$ref": "#/$defs/M17Params"
+        }
+      ],
+      "title": "Params"
+    },
+    "mode": {
+      "$ref": "#/$defs/RepeaterMode",
+      "description": "The channel's mode, derived from `params` so the two cannot disagree.",
+      "readOnly": true
+    }
+  },
+  "required": [
+    "name",
+    "callsign",
+    "nearest_city",
+    "rx_frequency_mhz",
+    "tx_frequency_mhz",
+    "ctcss_tx_hz",
+    "ctcss_rx_hz",
+    "dcs_tx_code",
+    "dcs_rx_code",
+    "latitude",
+    "longitude",
+    "distance_km",
+    "operational_status",
+    "use",
+    "band",
+    "notes",
+    "last_update",
+    "source_id",
+    "params",
+    "mode"
+  ],
+  "title": "RepeaterSpec",
+  "type": "object"
+}

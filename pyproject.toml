@@ -21,13 +21,17 @@ classifiers = [
 requires-python = ">=3.11"  # py_ver
 dependencies = [
     "aiohttp>=3.11.14",
+    "annotated-types>=0.7.0",
     "anyio>=4.9.0",
     "attrs>=25.3.0",
     "haversine>=2.9.0",
     "loguru>=0.7.3",
     "pycountry>=24.6.1",
+    # 2.11 for named type aliases (TypeAliasType) emitting shared $defs.
+    "pydantic>=2.11",
     "sqlmodel>=0.0.24",
     "tqdm>=4.67.1",
+    "typing-extensions>=4.12",
     "yarl>=1.18.3",
 ]
 
@@ -43,11 +47,23 @@ changelog = "https://github.com/MicaelJarniac/repeaterbook/blob/main/docs/CHANGE
 documentation = "https://repeaterbook.readthedocs.io"
 issues = "https://github.com/MicaelJarniac/repeaterbook/issues"
 
+[project.optional-dependencies]
+mcp = [
+    "fastmcp>=3.0.0",
+    "pydantic[email]>=2.11",
+    "pydantic-settings>=2.0",
+]
+
+[project.scripts]
+repeaterbook-mcp = "repeaterbook.mcp.server:main"
+repeaterbook-write-schema = "repeaterbook.spec:write_schema"
+
 [dependency-groups]
 tests = [
     "coverage>=7.6.11",
     "hypothesis>=6.125.3",
     "inline-snapshot>=0.20.2",
+    "jsonschema>=4.26.0",
     "pytest>=8.3.4",
     "pytest-benchmark>=5.1.0",
     "pytest-cov>=6.0.0",
@@ -68,6 +84,7 @@ typing = [
     "mypy>=1.15.0",
     # Typing stubs go here
     "types-tqdm>=4.67.0.20250319",
+    "types-jsonschema>=4.26.0",
 ]
 linting = [
     "ruff>=0.9.6",
@@ -110,7 +127,9 @@ ignore = [
 unfixable = ["ERA001"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "PLR2004", "S106"]
+# S101: asserts are the point. PLR2004: magic numbers are fixture data.
+# S106/S107: "tokens" here are literal test fixtures, not credentials.
+"tests/*" = ["S101", "PLR2004", "S106", "S107"]
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id", "type"]

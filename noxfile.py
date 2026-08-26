@@ -91,6 +91,24 @@ def test_code(session: nox.Session) -> None:
 
 
 @nox.session(python=python_version)
+def schema(session: nox.Session) -> None:
+    """Verify (default) or regenerate (`-- --write`) the RepeaterSpec JSON Schema.
+
+    In the CI matrix on purpose. The pre-commit hook that regenerates the
+    schema is `stages: [pre-commit]`, so CI's `--hook-stage=manual` run skips
+    it; without this session a stale committed schema would only be caught
+    indirectly, by a test buried in the wider suite.
+    """
+    install(session, groups=["tests"], root=True, extras=True)
+    if "--write" in session.posargs:
+        session.run("repeaterbook-write-schema")
+    else:
+        session.run(
+            "pytest", "tests/test_spec.py::test_committed_schema_matches_model", "-q"
+        )
+
+
+@nox.session(python=python_version)
 def docs(session: nox.Session) -> None:
     """Build documentation with MkDocs."""
     install(session, groups=["docs"], root=True)

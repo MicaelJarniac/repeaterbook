@@ -74,11 +74,15 @@ Use `pycountry` to find the correct country codes.
 
 Make sure you've installed the package:
 
-```bash
-pip install repeaterbook
-# or
-uv add repeaterbook
-```
+=== "uv (Recommended)"
+    ```bash
+    uv add repeaterbook
+    ```
+
+=== "pip"
+    ```bash
+    pip install repeaterbook
+    ```
 
 If using a virtual environment, ensure it's activated:
 
@@ -91,15 +95,27 @@ source .venv/bin/activate  # Linux/Mac
 
 These are dependencies that should be installed automatically. Try:
 
-```bash
-pip install --upgrade repeaterbook
-```
+=== "uv (Recommended)"
+    ```bash
+    uv add --upgrade repeaterbook
+    ```
+
+=== "pip"
+    ```bash
+    pip install --upgrade repeaterbook
+    ```
 
 Or install dependencies explicitly:
 
-```bash
-pip install sqlmodel aiohttp
-```
+=== "uv (Recommended)"
+    ```bash
+    uv add sqlmodel aiohttp
+    ```
+
+=== "pip"
+    ```bash
+    pip install sqlmodel aiohttp
+    ```
 
 ### SSL Certificate Errors
 
@@ -108,10 +124,19 @@ On some systems (especially macOS), you may encounter SSL errors. Install certif
 ```bash
 # macOS
 /Applications/Python\ 3.x/Install\ Certificates.command
-
-# Or install certifi
-pip install --upgrade certifi
 ```
+
+Or upgrade certifi:
+
+=== "uv (Recommended)"
+    ```bash
+    uv add --upgrade certifi
+    ```
+
+=== "pip"
+    ```bash
+    pip install --upgrade certifi
+    ```
 
 ## Usage Issues
 
