@@ -24,11 +24,31 @@ jobs:
       - run: |
           git checkout -B ${{ github.ref_name }} ${{ github.sha }}
 
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Run semantic-release from the locked environment rather than the
+      # published action. The action builds its own image and resolves
+      # gitpython~=3.0 at build time, so GitPython 3.1.60 -- which removed
+      # Actor.name_email_regex, an attribute PSR reads on every config load --
+      # breaks it from the outside, at every PSR version. Upstream:
+      # https://github.com/python-semantic-release/python-semantic-release/issues/1476
+      #
+      # Our lockfile pins a working GitPython, so this keeps releases
+      # reproducible and lets Dependabot bump both in step. Revert to the
+      # action once the fix ships.
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v10.6.1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+          uv sync --frozen --no-default-groups --only-group=release
+          uv run --no-sync semantic-release version
 
       - name: Publish package to GitHub
         uses: python-semantic-release/publish-action@v10.6.1
