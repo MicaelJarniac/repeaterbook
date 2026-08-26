@@ -4,9 +4,15 @@ An optional [Model Context Protocol](https://modelcontextprotocol.io) server —
 built on [FastMCP 3](https://gofastmcp.com) — that exposes RepeaterBook lookup to
 agents. Install with the extra:
 
-```bash
-pip install "repeaterbook[mcp]"
-```
+=== "uv (Recommended)"
+    ```bash
+    uv add "repeaterbook[mcp]"
+    ```
+
+=== "pip"
+    ```bash
+    pip install "repeaterbook[mcp]"
+    ```
 
 ## Configuration (environment)
 
