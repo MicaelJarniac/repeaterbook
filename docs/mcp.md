@@ -2,9 +2,27 @@
 
 An optional [Model Context Protocol](https://modelcontextprotocol.io) server —
 built on [FastMCP 3](https://gofastmcp.com) — that exposes RepeaterBook lookup to
-agents. Install with the extra:
+agents.
 
-=== "uv (Recommended)"
+The server ships as a console script, `repeaterbook-mcp`, behind the `mcp`
+extra. You don't normally install it yourself — point your MCP client at
+`uvx` and it will fetch and run the right version on demand, in its own
+isolated environment. See [Register with an MCP client](#register-with-an-mcp-client).
+
+To install it anyway — to run it by hand, or to use the subpackage as a
+library:
+
+=== "uvx (no install)"
+    ```bash
+    uvx --from "repeaterbook[mcp]" repeaterbook-mcp
+    ```
+
+=== "uv tool (persistent)"
+    ```bash
+    uv tool install "repeaterbook[mcp]"
+    ```
+
+=== "uv add (as a dependency)"
     ```bash
     uv add "repeaterbook[mcp]"
     ```
@@ -13,6 +31,10 @@ agents. Install with the extra:
     ```bash
     pip install "repeaterbook[mcp]"
     ```
+
+`uvx` needs `--from` because the command (`repeaterbook-mcp`) and the package
+(`repeaterbook`) have different names; `uv tool install` takes the package
+directly and installs whatever commands it provides.
 
 ## Configuration (environment)
 
@@ -38,11 +60,14 @@ logged in.
 
 ## Register with an MCP client
 
+Invoke it through `uvx`, which needs nothing installed up front:
+
 ```json
 {
   "mcpServers": {
     "repeaterbook": {
-      "command": "repeaterbook-mcp",
+      "command": "uvx",
+      "args": ["--from", "repeaterbook[mcp]", "repeaterbook-mcp"],
       "env": {
         "REPEATERBOOK_WORKING_DIR": "~/.repeaterbook",
         "REPEATERBOOK_APP_CONTACT": "you@example.com",
@@ -52,6 +77,31 @@ logged in.
   }
 }
 ```
+
+MCP clients launch servers directly rather than through a shell, so
+`"command"` has to be something on the client's `PATH`. `uvx` usually is;
+a console script from a virtual environment usually isn't.
+
+To pin a version, put it in the `--from` spec — `repeaterbook[mcp]==0.8.0`.
+
+If you'd rather have the command installed persistently, use
+`uv tool install` as above and then point the client straight at it:
+
+```json
+{
+  "mcpServers": {
+    "repeaterbook": {
+      "command": "repeaterbook-mcp",
+      "env": { "…": "as above" }
+    }
+  }
+}
+```
+
+That only works if the client can find `repeaterbook-mcp` on its `PATH`,
+which is not a given for GUI applications — they often don't inherit the
+`PATH` from your shell. Use an absolute path (`uv tool dir` will tell you
+where it landed) if the client can't find it.
 
 ## Tools
 
