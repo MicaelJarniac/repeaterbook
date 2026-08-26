@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import pycountry
 import pytest
 from aiohttp import web
+from loguru import logger
 from yarl import URL
 
 from repeaterbook.exceptions import (
     RepeaterBookAPIError,
     RepeaterBookForbiddenError,
     RepeaterBookRateLimitError,
+    RepeaterBookRowError,
     RepeaterBookUnauthorizedError,
     RepeaterBookValidationError,
 )
@@ -30,7 +32,9 @@ from repeaterbook.services import (
     USE_MAP,
     RepeaterBookAPI,
     json_to_model,
+    json_to_models,
     parse_date,
+    row_label,
 )
 
 if TYPE_CHECKING:
@@ -233,6 +237,160 @@ class TestJsonToModel:
         minimal_payload["EchoLink Node"] = 12345
         rep = json_to_model(minimal_payload)  # type: ignore[arg-type]
         assert rep.echolink_node == "12345"
+
+    def test_unknown_precise_value_defaults_to_false(
+        self, minimal_payload: dict[str, Any]
+    ) -> None:
+        """An unrecognised Precise value should default rather than raise KeyError."""
+        minimal_payload["Precise"] = "maybe"
+        rep = json_to_model(minimal_payload)  # type: ignore[arg-type]
+        assert rep.precise is False
+
+    def test_missing_precise_defaults_to_false(
+        self, minimal_payload: dict[str, Any]
+    ) -> None:
+        """An absent Precise key should default to False."""
+        del minimal_payload["Precise"]
+        rep = json_to_model(minimal_payload)  # type: ignore[arg-type]
+        assert rep.precise is False
+
+    def test_unknown_operational_status_defaults_to_unknown(
+        self, minimal_payload: dict[str, Any]
+    ) -> None:
+        """An unrecognised status should default rather than raise KeyError."""
+        minimal_payload["Operational Status"] = "Sporadic"
+        rep = json_to_model(minimal_payload)  # type: ignore[arg-type]
+        assert rep.operational_status == Status.UNKNOWN
+
+
+class TestRowLabel:
+    """Tests for row_label function."""
+
+    def test_full_label(self) -> None:
+        """State, id and callsign should all appear."""
+        row = {"State ID": "48", "Rptr ID": 24371, "Callsign": "W5AW"}
+        assert row_label(row) == "48:24371 (W5AW)"  # type: ignore[arg-type]
+
+    def test_label_without_callsign(self) -> None:
+        """A row with no callsign should still identify by state and id."""
+        assert row_label({"State ID": "48", "Rptr ID": 24371}) == "48:24371"  # type: ignore[arg-type]
+
+    def test_label_with_only_callsign(self) -> None:
+        """A row identified only by callsign should render just the callsign."""
+        assert row_label({"Callsign": "W5AW"}) == "(W5AW)"  # type: ignore[arg-type]
+
+    def test_label_skips_empty_parts(self) -> None:
+        """Empty identifier fields should be omitted, not rendered as blanks."""
+        assert row_label({"State ID": "", "Rptr ID": 7}) == "7"  # type: ignore[arg-type]
+
+    def test_unidentifiable_row(self) -> None:
+        """A row with no identifying fields should get a placeholder label."""
+        assert row_label({}) == "<unidentified>"  # type: ignore[arg-type]
+
+
+class TestJsonToModels:
+    """Tests for the lenient batch converter."""
+
+    @pytest.fixture
+    def good_row(self) -> dict[str, Any]:
+        """A row that converts cleanly."""
+        return {
+            "State ID": "06",
+            "Rptr ID": 1,
+            "Frequency": "146.940000",
+            "Input Freq": "146.340000",
+            "Nearest City": "Los Angeles",
+            "Lat": "34.0522",
+            "Long": "-118.2437",
+            "Precise": 1,
+            "Callsign": "W6ABC",
+            "Use": "OPEN",
+            "Operational Status": "On-air",
+            "FM Analog": "Yes",
+            "Last Update": "2024-01-15",
+        }
+
+    def test_all_good_rows_are_converted(self, good_row: dict[str, Any]) -> None:
+        """A clean batch should convert entirely, in input order."""
+        rows = [good_row, {**good_row, "Rptr ID": 2}, {**good_row, "Rptr ID": 3}]
+        repeaters = json_to_models(rows)  # type: ignore[arg-type]
+        assert [rep.repeater_id for rep in repeaters] == [1, 2, 3]
+
+    def test_empty_batch(self) -> None:
+        """An empty batch should produce no repeaters and no error."""
+        assert json_to_models([]) == []
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("Input Freq", "0.00000"),  # zero frequency
+            ("Frequency", "-1.0"),  # negative frequency
+            ("Lat", "not-a-number"),  # InvalidOperation
+            ("Lat", "91.0"),  # out-of-range latitude
+            ("Long", "181.0"),  # out-of-range longitude
+            ("Frequency", None),  # missing required decimal
+            ("FM Analog", []),  # TypeError from a bad boolean type
+        ],
+    )
+    def test_unmodellable_rows_are_skipped(
+        self,
+        good_row: dict[str, Any],
+        field: str,
+        value: object,
+    ) -> None:
+        """Each flavour of bad row should cost only itself."""
+        bad = {**good_row, "Rptr ID": 99, field: value}
+        repeaters = json_to_models([good_row, bad])  # type: ignore[list-item]
+        assert [rep.repeater_id for rep in repeaters] == [1]
+
+    def test_strict_raises_row_error(self, good_row: dict[str, Any]) -> None:
+        """Strict mode should raise, carrying the row and its cause."""
+        bad = {**good_row, "Rptr ID": 99, "Input Freq": "0.00000"}
+        with pytest.raises(RepeaterBookRowError) as exc:
+            json_to_models([good_row, bad], strict=True)  # type: ignore[list-item]
+
+        assert exc.value.label == "06:99 (W6ABC)"
+        assert exc.value.row == bad
+        assert exc.value.__cause__ is not None
+
+    def test_row_error_is_a_validation_error(self, good_row: dict[str, Any]) -> None:
+        """Row errors should be catchable as the existing validation error."""
+        bad = {**good_row, "Input Freq": "0.00000"}
+        with pytest.raises(RepeaterBookValidationError):
+            json_to_models([bad], strict=True)  # type: ignore[list-item]
+
+    def test_skips_are_logged_with_the_offender(
+        self,
+        good_row: dict[str, Any],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A skipped row must be named in the logs, not dropped silently."""
+        bad = {**good_row, "Rptr ID": 99, "Input Freq": "0.00000"}
+
+        handler_id = logger.add(caplog.handler, level="WARNING", format="{message}")
+        try:
+            json_to_models([good_row, bad])  # type: ignore[list-item]
+        finally:
+            logger.remove(handler_id)
+
+        assert "06:99 (W6ABC)" in caplog.text
+        assert "Skipped 1 unmodellable of 2" in caplog.text
+
+    def test_bugs_in_our_own_mapping_still_propagate(
+        self,
+        good_row: dict[str, Any],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Leniency must not swallow library bugs, only bad data."""
+        msg = "bug in mapping code"
+
+        def _boom(_: Any) -> Any:  # noqa: ANN401
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr("repeaterbook.services.json_to_model", _boom)
+
+        with pytest.raises(RuntimeError, match="bug in mapping code"):
+            json_to_models([good_row])  # type: ignore[list-item]
 
 
 class TestRepeaterBookAPIUrls:
@@ -461,6 +619,97 @@ class TestRepeaterBookAPIExport:
             result = await api.export_json(url)
             assert result["count"] == 1
             assert len(result["results"]) == 1
+
+
+class TestRepeaterBookAPIDownload:
+    """Tests for RepeaterBookAPI.download row tolerance."""
+
+    _GOOD: ClassVar[dict[str, Any]] = {
+        "State ID": "48",
+        "Rptr ID": 1,
+        "Frequency": "146.940000",
+        "Input Freq": "146.340000",
+        "Nearest City": "Austin",
+        "Lat": "30.2672",
+        "Long": "-97.7431",
+        "Precise": 1,
+        "Callsign": "W5GOOD",
+        "Use": "OPEN",
+        "Operational Status": "On-air",
+        "FM Analog": "Yes",
+        "Last Update": "2025-01-01",
+    }
+    # The Texas row that made the whole state undownloadable.
+    _BAD: ClassVar[dict[str, Any]] = {
+        **_GOOD,
+        "Rptr ID": 24371,
+        "Callsign": "W5AW",
+        "Frequency": "1253.30000",
+        "Input Freq": "0.00000",
+    }
+
+    @staticmethod
+    def _api(url: URL, tmp_path: StdPath) -> RepeaterBookAPI:
+        """Point a client at the local test server."""
+        return RepeaterBookAPI(base_url=url.origin(), working_dir=Path(tmp_path))
+
+    @pytest.mark.anyio
+    async def test_download_skips_malformed_row(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """One unmodellable row must not discard the good rows beside it."""
+        rows = [self._GOOD, self._BAD, {**self._GOOD, "Rptr ID": 2}]
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response({"count": len(rows), "results": rows})
+
+        async with local_server(handler, path="/api/export.php") as url:
+            api = self._api(url, tmp_path)
+            repeaters = await api.download(ExportQuery(state_ids=frozenset({"48"})))
+
+        assert [rep.repeater_id for rep in repeaters] == [1, 2]
+
+    @pytest.mark.anyio
+    async def test_download_strict_raises_on_malformed_row(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """Opting into strict mode should surface the offending row."""
+        rows = [self._GOOD, self._BAD]
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response({"count": len(rows), "results": rows})
+
+        async with local_server(handler, path="/api/export.php") as url:
+            api = self._api(url, tmp_path)
+            with pytest.raises(RepeaterBookRowError) as exc:
+                await api.download(
+                    ExportQuery(state_ids=frozenset({"48"})),
+                    strict=True,
+                )
+
+        assert exc.value.label == "48:24371 (W5AW)"
+
+    @pytest.mark.anyio
+    async def test_download_returns_all_good_rows(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+    ) -> None:
+        """A clean response should convert in full."""
+        rows = [{**self._GOOD, "Rptr ID": i} for i in range(3)]
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response({"count": len(rows), "results": rows})
+
+        async with local_server(handler, path="/api/export.php") as url:
+            api = self._api(url, tmp_path)
+            repeaters = await api.download(ExportQuery(state_ids=frozenset({"48"})))
+
+        assert len(repeaters) == 3
 
 
 class TestRepeaterBookAPIAuth:

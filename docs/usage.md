@@ -766,8 +766,17 @@ except RepeaterBookError as e:
 |-----------|-------------|
 | `RepeaterBookError` | Base exception for all library errors |
 | `RepeaterBookAPIError` | API returned an error response |
+| `RepeaterBookUnauthorizedError` | HTTP 401 — missing or invalid app token |
+| `RepeaterBookForbiddenError` | HTTP 403 — User-Agent or authorization denied |
+| `RepeaterBookRateLimitError` | HTTP 429 — rate limited; carries `retry_after` |
 | `RepeaterBookValidationError` | Invalid data or response format |
+| `RepeaterBookRowError` | A single export row could not be modelled |
 | `RepeaterBookCacheError` | Cache operations failed |
+
+`RepeaterBookUnauthorizedError`, `RepeaterBookForbiddenError` and
+`RepeaterBookRateLimitError` are subclasses of `RepeaterBookAPIError`;
+`RepeaterBookRowError` is a subclass of `RepeaterBookValidationError`. Catching
+the parent catches all of them.
 
 ### Data Validation
 
@@ -778,6 +787,33 @@ The `Repeater` model includes built-in validation:
 # - Latitude must be between -90 and 90
 # - Longitude must be between -180 and 180
 # - Frequency must be positive
+```
+
+### Malformed Rows
+
+RepeaterBook's data is community-maintained, and individual records
+occasionally fail that validation — a zero input frequency, an out-of-range
+coordinate. `download()` **logs and skips** those rows rather than failing the
+whole response, so one bad record cannot cost you the other few thousand.
+
+To see exactly what was dropped, pass a list for `skipped`:
+
+```python
+from repeaterbook.exceptions import RepeaterBookRowError
+
+skipped: list[RepeaterBookRowError] = []
+repeaters = await api.download(query, skipped=skipped)
+
+for error in skipped:
+    print(f"Dropped {error.label}: {error}")  # e.g. "48:24371 (W5AW)"
+    print(error.row)  # the raw payload, for reporting upstream
+```
+
+If you would rather a malformed row be an error, opt into strict mode:
+
+```python
+# Raises RepeaterBookRowError on the first row that cannot be modelled.
+repeaters = await api.download(query, strict=True)
 ```
 
 ## Logging

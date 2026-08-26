@@ -10,6 +10,7 @@ __all__: tuple[str, ...] = (
     "RepeaterBookError",
     "RepeaterBookForbiddenError",
     "RepeaterBookRateLimitError",
+    "RepeaterBookRowError",
     "RepeaterBookUnauthorizedError",
     "RepeaterBookValidationError",
 )
@@ -127,3 +128,39 @@ class RepeaterBookValidationError(RepeaterBookError):
     - Required fields are missing from the response
     - Data values fail validation (e.g., invalid coordinates)
     """
+
+
+class RepeaterBookRowError(RepeaterBookValidationError):
+    """A single export row could not be converted into a `Repeater`.
+
+    RepeaterBook data is community-maintained, so individual rows are
+    occasionally unmodellable (a zero input frequency, an out-of-range
+    coordinate, a missing frequency). This wraps the underlying parse or
+    validation failure together with the offending row, so a caller can tell
+    *which* record failed and why.
+
+    By default `RepeaterBookAPI.download` logs and skips these rather than
+    raising, so one bad row cannot discard an otherwise good response. Pass
+    `strict=True` to have them propagate instead.
+
+    Attributes:
+        row: The raw export row that failed to convert.
+        label: Best-effort identifier for the row, e.g. `"48:24371 (W5AW)"`.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        row: object | None = None,
+        label: str | None = None,
+    ) -> None:
+        """Initialize a row error with the offending row and its label."""
+        self.message = message
+        self.row = row
+        self.label = label
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        """Render the message, prefixed with the row label when known."""
+        return f"row {self.label}: {self.message}" if self.label else self.message

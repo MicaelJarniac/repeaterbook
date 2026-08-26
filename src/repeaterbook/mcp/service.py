@@ -17,6 +17,7 @@ from repeaterbook.utils import Radius
 
 if TYPE_CHECKING:
     from repeaterbook.database import RepeaterBook
+    from repeaterbook.exceptions import RepeaterBookRowError
     from repeaterbook.models import ExportQuery
     from repeaterbook.queries import BandName
     from repeaterbook.services import RepeaterBookAPI
@@ -34,6 +35,13 @@ class SyncResult(BaseModel):
             "meaning rows were almost certainly dropped."
         )
     )
+    skipped: int = Field(
+        default=0,
+        description=(
+            "Rows RepeaterBook served that could not be modelled and were "
+            "skipped. Community-maintained data occasionally contains these."
+        ),
+    )
     detail: str | None = Field(
         default=None, description="How to narrow the scope, when truncated."
     )
@@ -45,19 +53,25 @@ async def sync(
     query: ExportQuery,
 ) -> SyncResult:
     """Download repeaters for a query and merge them into the local DB."""
-    repeaters = await api.download(query)
+    skipped: list[RepeaterBookRowError] = []
+    repeaters = await api.download(query, skipped=skipped)
     db.populate(repeaters)
     # The API caps a response and says nothing about it, so a query at the
     # limit has almost certainly lost rows. The library logs this, but a log
     # line is invisible to an MCP caller: report it in the result instead.
-    truncated = len(repeaters) >= api.max_count
+    # Count against rows served, not rows modelled: a skipped row still
+    # consumed a slot against the cap, so using len(repeaters) here would
+    # under-report truncation for any capped response containing a bad row.
+    truncated = len(repeaters) + len(skipped) >= api.max_count
     return SyncResult(
         count=len(repeaters),
         truncated=truncated,
+        skipped=len(skipped),
         detail=(
-            f"RepeaterBook returned {len(repeaters)} rows, its per-response "
-            "limit, so this scope is very likely incomplete. Narrow it (for "
-            "the US, Canada and Mexico, sync one state at a time)."
+            f"RepeaterBook returned {len(repeaters) + len(skipped)} rows, its "
+            "per-response limit, so this scope is very likely incomplete. "
+            "Narrow it (for the US, Canada and Mexico, sync one state at a "
+            "time)."
             if truncated
             else None
         ),

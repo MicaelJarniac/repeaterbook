@@ -160,9 +160,15 @@ syncing a country and reading them back: any subdivision missing from the
 truncated slice would be invisible, and a subdivision with no repeaters yet is
 still a valid query value. That's why the library carries the list.
 
-`sync_repeaters` returns a `SyncResult` with `count`, `truncated` and
-`detail`. When `truncated` is true the scope hit the cap and is very likely
+`sync_repeaters` returns a `SyncResult` with `count`, `truncated`, `skipped`
+and `detail`. When `truncated` is true the scope hit the cap and is very likely
 incomplete.
+
+`skipped` counts rows RepeaterBook served that could not be modelled and were
+dropped — community-maintained data occasionally contains these, and one of
+them should not cost you the rest of the region. Skipped rows still count
+toward the cap for the purposes of `truncated`, since the API spent a slot on
+them.
 
 ### Syncing
 

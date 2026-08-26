@@ -10,6 +10,7 @@ __all__: tuple[str, ...] = (
     "RepeaterBookError",
     "RepeaterBookForbiddenError",
     "RepeaterBookRateLimitError",
+    "RepeaterBookRowError",
     "RepeaterBookUnauthorizedError",
     "RepeaterBookValidationError",
     "__version__",
@@ -24,6 +25,7 @@ from repeaterbook.exceptions import (
     RepeaterBookError,
     RepeaterBookForbiddenError,
     RepeaterBookRateLimitError,
+    RepeaterBookRowError,
     RepeaterBookUnauthorizedError,
     RepeaterBookValidationError,
 )

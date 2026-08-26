@@ -4,11 +4,14 @@ from __future__ import annotations
 
 __all__: tuple[str, ...] = (
     "BOOL_MAP",
+    "ROW_ERRORS",
     "STATUS_MAP",
     "USE_MAP",
     "RepeaterBookAPI",
     "fetch_json",
     "json_to_model",
+    "json_to_models",
+    "row_label",
 )
 
 import asyncio
@@ -18,7 +21,7 @@ import json
 import time
 from contextlib import suppress
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, ClassVar, Final, NotRequired, TypedDict, cast
 
@@ -34,6 +37,7 @@ from repeaterbook.exceptions import (
     RepeaterBookAPIError,
     RepeaterBookForbiddenError,
     RepeaterBookRateLimitError,
+    RepeaterBookRowError,
     RepeaterBookUnauthorizedError,
     RepeaterBookValidationError,
 )
@@ -55,7 +59,7 @@ from repeaterbook.models import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
 
 
 IdentityHeaders = TypedDict(
@@ -288,14 +292,10 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             state=s("State") or None,
             latitude=d("Lat"),
             longitude=d("Long"),
-            precise=BOOL_MAP[j.get("Precise", 0)],
+            precise=b("Precise", default=False),
             callsign=s("Callsign") or None,
             use_membership=USE_MAP.get(s("Use"), Use.OPEN),
-            operational_status=(
-                STATUS_MAP[s("Operational Status")]
-                if s("Operational Status")
-                else Status.UNKNOWN
-            ),
+            operational_status=STATUS_MAP.get(s("Operational Status"), Status.UNKNOWN),
             ares=s("ARES") or None,
             races=s("RACES") or None,
             skywarn=s("SKYWARN") or None,
@@ -326,6 +326,93 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             last_update=parse_date(s("Last Update")),
         )
     )
+
+
+# Everything a single malformed row can realistically throw on its way to a
+# Repeater. Pydantic's ValidationError is a ValueError, and so is the ValueError
+# raised for a missing decimal; InvalidOperation (an ArithmeticError) comes from
+# Decimal() on unparseable text; TypeError from a boolean field of the wrong
+# type; LookupError from an unexpected enum key. Deliberately not
+# `Exception`: a bug in our own mapping code should still surface loudly rather
+# than quietly costing the caller a record.
+ROW_ERRORS: Final[tuple[type[Exception], ...]] = (
+    ValueError,
+    InvalidOperation,
+    TypeError,
+    LookupError,
+)
+
+
+def row_label(j: RepeaterJSON, /) -> str:
+    """Best-effort human identifier for an export row, for logs and errors.
+
+    Renders as `"<State ID>:<Rptr ID> (<Callsign>)"`, omitting whatever the row
+    does not carry, and falling back to `"<unidentified>"` for a row with none
+    of the three.
+    """
+    state_id = j.get("State ID")
+    repeater_id = j.get("Rptr ID")
+    callsign = j.get("Callsign")
+
+    parts = [str(part) for part in (state_id, repeater_id) if part not in (None, "")]
+    ident = ":".join(parts)
+    if callsign:
+        ident = f"{ident} ({callsign})" if ident else f"({callsign})"
+    return ident or "<unidentified>"
+
+
+def json_to_models(
+    results: Iterable[RepeaterJSON],
+    /,
+    *,
+    strict: bool = False,
+    skipped: list[RepeaterBookRowError] | None = None,
+) -> list[Repeater]:
+    """Convert export rows to `Repeater` models, tolerating unmodellable rows.
+
+    RepeaterBook's data is community-maintained, so a batch occasionally
+    contains a row that cannot be modelled -- a zero input frequency, an
+    out-of-range coordinate, a missing frequency. Converting the batch
+    all-or-nothing means one such row discards every good record alongside it.
+
+    Args:
+        results: Raw export rows.
+        strict: When True, re-raise the first unmodellable row as a
+            `RepeaterBookRowError` instead of skipping it.
+        skipped: Optional list to collect a `RepeaterBookRowError` per skipped
+            row. Lets a caller inspect what was dropped without scraping logs.
+
+    Returns:
+        The successfully converted repeaters, in input order.
+
+    Raises:
+        RepeaterBookRowError: If `strict` is True and a row cannot be
+            converted.
+    """
+    repeaters: list[Repeater] = []
+    errors: list[RepeaterBookRowError] = []
+
+    for result in results:
+        try:
+            repeaters.append(json_to_model(result))
+        except ROW_ERRORS as exc:
+            label = row_label(result)
+            error = RepeaterBookRowError(str(exc), row=result, label=label)
+            if strict:
+                raise error from exc
+            errors.append(error)
+            logger.warning(f"Skipping unmodellable repeater {label}: {exc}")
+
+    if errors:
+        labels = ", ".join(str(error.label) for error in errors)
+        logger.warning(
+            f"Skipped {len(errors)} unmodellable of {len(errors) + len(repeaters)} "
+            f"repeaters: {labels}"
+        )
+    if skipped is not None:
+        skipped.extend(errors)
+
+    return repeaters
 
 
 def _to_secret(value: SecretStr | str) -> SecretStr:
@@ -581,15 +668,40 @@ class RepeaterBookAPI:
         tasks = [self.export_json(url) for url in urls]
         return await asyncio.gather(*tasks)
 
-    async def download(self, query: ExportQuery) -> list[Repeater]:
-        """Download repeaters."""
+    async def download(
+        self,
+        query: ExportQuery,
+        *,
+        strict: bool = False,
+        skipped: list[RepeaterBookRowError] | None = None,
+    ) -> list[Repeater]:
+        """Download repeaters.
+
+        Rows that cannot be modelled are logged and skipped, so a single
+        malformed record does not discard an otherwise good response. The
+        RepeaterBook data is community-maintained and such rows do occur.
+
+        Args:
+            query: The export query to download.
+            strict: When True, raise `RepeaterBookRowError` on the first
+                unmodellable row instead of skipping it.
+            skipped: Optional list to collect a `RepeaterBookRowError` per
+                skipped row.
+
+        Returns:
+            The downloaded repeaters, minus any skipped rows.
+
+        Raises:
+            RepeaterBookRowError: If `strict` is True and a row cannot be
+                converted.
+        """
         data = await self.export_multi_json(self.urls_export(query))
 
         results: list[RepeaterJSON] = []
         for export in data:
             results.extend(export["results"])
 
-        repeaters = [json_to_model(result) for result in results]
+        repeaters = json_to_models(results, strict=strict, skipped=skipped)
 
-        logger.info(f"Downloaded {len(repeaters)} repeaters.")
+        logger.info(f"Downloaded {len(repeaters)} of {len(results)} repeaters.")
         return repeaters
