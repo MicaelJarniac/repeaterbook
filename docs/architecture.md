@@ -177,7 +177,9 @@ download() called
      │   └─> Convert to RepeaterJSON TypedDict
      │
      ├─> Convert to Repeater models
-     │   └─> json_to_model() transformation
+     │   └─> json_to_models() over the batch
+     │       ├─> json_to_model() per row
+     │       └─> Unmodellable row? Log, skip, keep going
      │
      ├─> Cache results
      │   └─> Write to cache file
@@ -187,25 +189,46 @@ download() called
 
 #### Data Transformation
 
-The `json_to_model()` function converts API JSON to `Repeater` objects:
+The `json_to_model()` function converts one API row to a `Repeater`, and
+`json_to_models()` applies it across a batch.
 
-```python
-def json_to_model(data: RepeaterJSON) -> Repeater:
-    """Convert JSON payload to Repeater model."""
-    return Repeater(
-        id=int(data["Rptr_ID"]),
-        callsign=data["Callsign"],
-        frequency=float(data["Frequency"]),
-        # ... field mappings with type conversion
-    )
-```
+**`json_to_model()` handles:**
 
-**Handles:**
-
-- **Type Conversion**: String → Float, Int, Bool, Date
+- **Type Conversion**: String → Decimal, Int, Bool, Date
 - **Missing Fields**: Provides sensible defaults
 - **Variations**: Different API formats (NA vs RoW)
-- **Boolean Normalization**: "Yes"/"No", "1"/"0" → True/False
+- **Boolean Normalization**: "Yes"/"No", 1/0 → True/False
+- **Unknown Enum Values**: Unrecognized `Use`/`Operational Status`/`Precise`
+  values fall back to a default rather than raising
+
+#### Row-level Resilience
+
+A row that still cannot be modelled — a zero input frequency, an out-of-range
+coordinate — is a data problem, not a response problem. `json_to_models()`
+therefore isolates failures to the row that caused them:
+
+```python
+for result in results:
+    try:
+        repeaters.append(json_to_model(result))
+    except ROW_ERRORS as exc:
+        ...  # log, record, and continue
+```
+
+`ROW_ERRORS` is deliberately narrow (`ValueError`, `InvalidOperation`,
+`TypeError`, `LookupError`) rather than a bare `Exception`: bad *data* is
+skipped, but a bug in the mapping code still surfaces loudly instead of quietly
+costing the caller records.
+
+Callers choose the policy:
+
+- **Default (lenient)** — skip and warn, so one bad row can't discard a good
+  response. Pass `skipped=[]` to collect a `RepeaterBookRowError` per dropped
+  row, each carrying the raw payload and a `label` like `48:24371 (W5AW)`.
+- **`strict=True`** — raise `RepeaterBookRowError` on the first bad row.
+
+This mirrors the library's general stance on community-maintained data: don't
+assume every field is populated, and don't let one record speak for the batch.
 
 ### 3. Database (`database.py`)
 

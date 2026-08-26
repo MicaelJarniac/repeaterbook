@@ -266,3 +266,64 @@ async def test_sync_flags_a_truncated_response(
     assert result.truncated is True
     assert result.detail is not None
     assert "Narrow it" in result.detail
+
+
+async def test_sync_reports_skipped_rows(
+    local_server: Any,  # noqa: ANN401
+    tmp_path: Path,
+) -> None:
+    """An unmodellable row must be counted, not silently dropped from the total."""
+
+    async def _handler(_: web.Request) -> web.Response:
+        rows = [
+            _ROW_RESULT,
+            # Zero input frequency: unmodellable, as seen in the Texas export.
+            {**_ROW_RESULT, "Rptr ID": 43, "Input Freq": "0.00000"},
+        ]
+        return web.json_response({"count": len(rows), "results": rows})
+
+    async with local_server(_handler, path="/api/exportROW.php") as url:
+        base = URL.build(scheme=url.scheme, host=url.host, port=url.port)
+        api = RepeaterBookAPI(base_url=base, working_dir=AsyncPath(tmp_path))
+        db = RepeaterBook(working_dir=AsyncPath(tmp_path))
+        query = ExportQuery(countries=frozenset({countries.get(name="Australia")}))
+
+        result = await sync(api, db, query)
+
+    assert result.count == 1
+    assert result.skipped == 1
+    assert result.truncated is False
+    assert len(db.query()) == 1
+
+
+async def test_sync_counts_skipped_rows_towards_truncation(
+    local_server: Any,  # noqa: ANN401
+    tmp_path: Path,
+) -> None:
+    """A skipped row still consumed a slot against the API's cap.
+
+    Counting only the modelled rows would let a capped response containing a
+    bad row report itself as complete, hiding real data loss.
+    """
+
+    async def _handler(_: web.Request) -> web.Response:
+        rows = [
+            {**_ROW_RESULT, "Rptr ID": 1},
+            {**_ROW_RESULT, "Rptr ID": 2},
+            {**_ROW_RESULT, "Rptr ID": 3, "Input Freq": "0.00000"},
+        ]
+        return web.json_response({"count": len(rows), "results": rows})
+
+    async with local_server(_handler, path="/api/exportROW.php") as url:
+        base = URL.build(scheme=url.scheme, host=url.host, port=url.port)
+        api = RepeaterBookAPI(
+            base_url=base, working_dir=AsyncPath(tmp_path), max_count=3
+        )
+        db = RepeaterBook(working_dir=AsyncPath(tmp_path))
+        query = ExportQuery(countries=frozenset({countries.get(name="Australia")}))
+
+        result = await sync(api, db, query)
+
+    assert result.count == 2
+    assert result.skipped == 1
+    assert result.truncated is True

@@ -532,7 +532,11 @@ The RepeaterBook Python Client uses a hierarchy of custom exceptions:
 |-----------|------------|
 | `RepeaterBookError` | Base exception for all library errors |
 | `RepeaterBookAPIError` | API returned an error response (status: "error") |
+| `RepeaterBookUnauthorizedError` | HTTP 401 — missing or invalid app token |
+| `RepeaterBookForbiddenError` | HTTP 403 — User-Agent or authorization denied |
+| `RepeaterBookRateLimitError` | HTTP 429 — rate limited; carries `retry_after` |
 | `RepeaterBookValidationError` | Invalid data or response format |
+| `RepeaterBookRowError` | A single export row could not be modelled |
 | `RepeaterBookCacheError` | Cache read/write operations failed |
 
 ### How do I handle errors properly?
@@ -562,7 +566,41 @@ The `Repeater` model validates data automatically:
 - **Longitude** must be between -180 and 180
 - **Frequency** must be positive
 
-If you're seeing validation errors, the data from the API may be malformed.
+A single row that fails these checks does **not** fail a download. The data is
+community-maintained and bad rows do occur, so `download()` logs and skips them
+and returns everything else. You'll see a warning like:
+
+```text
+Skipping unmodellable repeater 48:24371 (W5AW): Frequency must be positive, got 0.00000
+Skipped 1 unmodellable of 1669 repeaters: 48:24371 (W5AW)
+```
+
+### How do I find out which rows were skipped?
+
+Pass a list for `skipped` and inspect it afterwards:
+
+```python
+from repeaterbook.exceptions import RepeaterBookRowError
+
+skipped: list[RepeaterBookRowError] = []
+repeaters = await api.download(query, skipped=skipped)
+
+print(f"{len(repeaters)} usable, {len(skipped)} dropped")
+for error in skipped:
+    print(error.label, "->", error)
+```
+
+Each entry keeps the offending payload on `error.row`, which is what you'd
+attach when reporting the record to RepeaterBook.
+
+### Can I make malformed rows an error instead?
+
+Yes — pass `strict=True` and the first unmodellable row raises
+`RepeaterBookRowError` instead of being skipped:
+
+```python
+repeaters = await api.download(query, strict=True)
+```
 
 ## Troubleshooting
 

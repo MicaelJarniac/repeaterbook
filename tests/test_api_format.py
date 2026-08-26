@@ -5,7 +5,10 @@ We keep these tests offline by using minimal representative payload fragments.
 
 from __future__ import annotations
 
-from repeaterbook.services import json_to_model
+import pytest
+
+from repeaterbook.exceptions import RepeaterBookRowError
+from repeaterbook.services import json_to_model, json_to_models
 
 
 def test_json_to_model_accepts_row_payload_with_extra_keys() -> None:
@@ -113,3 +116,53 @@ def test_json_to_model_accepts_north_america_payload_without_region() -> None:
     rep = json_to_model(payload)  # type: ignore[arg-type]
     assert rep.region is None
     assert rep.county == "SomeCounty"
+
+
+# The real Texas row that made state_id="48" undownloadable: a 1.2 GHz repeater
+# published with a zero input frequency. Kept verbatim as the regression seed.
+_TEXAS_BAD_ROW = {
+    "State ID": "48",
+    "Rptr ID": 24371,
+    "Callsign": "W5AW",
+    "Frequency": "1253.30000",
+    "Input Freq": "0.00000",
+    "Nearest City": "Brownwood",
+    "Lat": "31.7093",
+    "Long": "-98.9912",
+    "Precise": 1,
+    "Use": "OPEN",
+    "Operational Status": "On-air",
+    "FM Analog": "Yes",
+    "Last Update": "2025-01-01",
+}
+
+_TEXAS_GOOD_ROW = {
+    **_TEXAS_BAD_ROW,
+    "Rptr ID": 1000,
+    "Callsign": "W5GOOD",
+    "Frequency": "146.940000",
+    "Input Freq": "146.340000",
+}
+
+
+def test_zero_input_frequency_row_is_skipped_not_fatal() -> None:
+    """A zero input frequency must cost one row, not the whole response.
+
+    Regression for the Texas export, where repeater 48:24371 published
+    `"Input Freq": "0.00000"` and took all 1668 good rows down with it.
+    """
+    rows = [_TEXAS_GOOD_ROW, _TEXAS_BAD_ROW, {**_TEXAS_GOOD_ROW, "Rptr ID": 1001}]
+
+    repeaters = json_to_models(rows)  # type: ignore[arg-type]
+
+    assert [rep.repeater_id for rep in repeaters] == [1000, 1001]
+
+
+def test_zero_input_frequency_row_raises_under_strict() -> None:
+    """Strict mode must name the offending row rather than silently dropping it."""
+    with pytest.raises(RepeaterBookRowError) as exc:
+        json_to_models([_TEXAS_GOOD_ROW, _TEXAS_BAD_ROW], strict=True)  # type: ignore[list-item]
+
+    assert exc.value.label == "48:24371 (W5AW)"
+    assert exc.value.row == _TEXAS_BAD_ROW
+    assert "Frequency must be positive" in str(exc.value)
