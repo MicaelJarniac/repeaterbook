@@ -50,12 +50,14 @@ jobs:
           uv sync --frozen --no-default-groups --only-group=release
           uv run --no-sync semantic-release version
 
+      # Same reason as the release step above: publish-action is also a
+      # Docker action and resolves the broken GitPython at build time.
       - name: Publish package to GitHub
-        uses: python-semantic-release/publish-action@v10.6.1
         if: steps.release.outputs.released == 'true'
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.release.outputs.tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run --no-sync semantic-release publish --tag "${{ steps.release.outputs.tag }}"
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
