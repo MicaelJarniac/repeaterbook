@@ -6,6 +6,30 @@
   "commit": false,
   "contributors": [
     {
+      "login": "MicaelJarniac",
+      "name": "Micael Jarniac",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19514231?v=4",
+      "profile": "https://github.com/MicaelJarniac",
+      "contributions": [
+        "bug",
+        "code",
+        "content",
+        "data",
+        "doc",
+        "example",
+        "ideas",
+        "infra",
+        "maintenance",
+        "projectManagement",
+        "question",
+        "research",
+        "review",
+        "tool",
+        "test",
+        "userTesting"
+      ]
+    },
+    {
       "login": "adamancini",
       "name": "ada mancini",
       "avatar_url": "https://avatars.githubusercontent.com/u/292598?v=4",
