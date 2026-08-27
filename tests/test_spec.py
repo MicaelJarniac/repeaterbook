@@ -118,6 +118,30 @@ def test_spec_round_trips_through_json() -> None:
     assert RepeaterSpec.model_validate_json(spec.model_dump_json()) == spec
 
 
+def test_spec_last_update_serializes_as_rfc3339(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """`last_update` must serialize as RFC 3339 so MCP date-time validation passes.
+
+    A naive datetime serializes without an offset (e.g. `2026-01-01T00:00:00`),
+    which is not valid RFC 3339 and is rejected by strict MCP clients validating
+    structured output against the `format: date-time` schema. The mapper must
+    therefore produce a timezone-aware `last_update`. See issue #50.
+    """
+    spec = repeater_to_specs(sample_repeater())[0]
+    assert spec.last_update.tzinfo is not None
+    serialized = json.loads(spec.model_dump_json())["last_update"]
+    # RFC 3339 requires an offset; a bare `...T00:00:00` would be invalid.
+    assert serialized.endswith(("Z", "+00:00"))
+    jsonschema.validate(
+        {"last_update": serialized},
+        {
+            "type": "object",
+            "properties": {"last_update": {"type": "string", "format": "date-time"}},
+        },
+    )
+
+
 def test_extra_key_on_params_is_rejected() -> None:
     """Params models forbid unknown keys, e.g. a color code on FmParams."""
     with pytest.raises(ValidationError) as excinfo:
