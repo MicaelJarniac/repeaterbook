@@ -203,11 +203,30 @@ which is a union discriminated on its own `mode` field:
   "distance_km": "12.345",
   "operational_status": "ON_AIR",
   "use": "OPEN",
+  "allstar_node": null,
+  "echolink_node": "67890",
+  "irlp_node": null,
+  "wires_node": null,
   "last_update": "2026-01-01T00:00:00",
   "mode": "DMR",
   "params": { "mode": "DMR", "dmr_id": "5051", "color_code": "1" }
 }
 ```
+
+### Internet-linking nodes
+
+`allstar_node`, `echolink_node`, `irlp_node` and `wires_node` carry a
+repeater's node id on each linking network, or `null` where it has none.
+
+They sit at the top level rather than inside `params` because they are not RF
+modes: they do not change how a channel is programmed, and are typically
+reached by DTMF on an otherwise ordinary FM channel. A repeater that fans out
+into several specs repeats its node ids on each of them, since the linking
+backend belongs to the repeater rather than to one mode.
+
+RepeaterBook writes an absent node as the literal `"0"` as well as as an empty
+value, and `"0"` is the most common value in real exports. Both are normalized
+to `null`, so a non-null node field always means a real, dialable node.
 
 Uplink and downlink tones are carried separately — `ctcss_tx_hz`/`dcs_tx_code`
 for the uplink, `ctcss_rx_hz`/`dcs_rx_code` for the downlink. A repeater can use

@@ -5,6 +5,10 @@ expands to one spec per mode. `params` is a union discriminated on its own
 `mode` field, and `extra="forbid"` on each params model is what makes a
 mode/params mismatch illegal by construction. `RepeaterSpec.mode` re-exposes
 `params.mode` at the top level, so the two can never disagree.
+
+Internet-linking node ids (AllStar, EchoLink, IRLP, Wires-X) sit at the top
+level rather than in `params`: they are not RF modes and do not change how a
+channel is programmed, so they belong outside the mode-discriminated union.
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ __all__: tuple[str, ...] = (
     "TetraParams",
     "Tone",
     "freq_to_band",
+    "parse_node_id",
     "parse_tone",
     "repeater_spec_json_schema",
     "repeater_to_specs",
@@ -178,6 +183,10 @@ class RepeaterSpec(BaseModel):
     use: RepeaterUse
     band: str | None
     notes: str | None
+    allstar_node: str | None
+    echolink_node: str | None
+    irlp_node: str | None
+    wires_node: str | None
     last_update: datetime
     source: str = "repeaterbook"
     source_id: str
@@ -247,6 +256,23 @@ def parse_tone(raw: str | None) -> Tone:
     return Tone(None, None)
 
 
+def parse_node_id(raw: str | None) -> str | None:
+    """Normalize a linking-node id, mapping RepeaterBook's absent-node forms to None.
+
+    RepeaterBook spells "this repeater has no node on this network" three ways:
+    a missing key, an empty string, and the literal `"0"`. Ingest already folds
+    the first two to None (`services.py` uses `or None`), but `"0"` survives into
+    the stored `Repeater` and is by far the most common value in real exports.
+    Zero is not a valid id on AllStar, EchoLink, IRLP or Wires-X, so passing it
+    through would make a non-null node field stop implying a dialable node and
+    push the sentinel onto every consumer.
+    """
+    if raw is None or not (value := raw.strip()):
+        return None
+    # Any all-zero spelling ("0", "00", ...) is the absent-node sentinel.
+    return None if set(value) == {"0"} else value
+
+
 def freq_to_band(freq: FrequencyMHz) -> str | None:
     """Return the amateur band name for a frequency, or None if unknown."""
     # Lazy import: breaks a models<->spec import cycle.
@@ -313,6 +339,12 @@ def repeater_to_specs(
             use=RepeaterUse[rep.use_membership.name],
             band=freq_to_band(rep.frequency),
             notes=rep.notes,
+            # Linking backends are mode-agnostic, so a multi-mode repeater
+            # repeats them on every spec it fans out to.
+            allstar_node=parse_node_id(rep.allstar_node),
+            echolink_node=parse_node_id(rep.echolink_node),
+            irlp_node=parse_node_id(rep.irlp_node),
+            wires_node=parse_node_id(rep.wires_node),
             last_update=datetime.combine(
                 rep.last_update, datetime.min.time(), tzinfo=UTC
             ),
