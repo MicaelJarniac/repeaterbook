@@ -39,6 +39,18 @@
         "ideas",
         "userTesting"
       ]
+    },
+    {
+      "login": "aaronjbrown",
+      "name": "aaronjbrown",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3600966?v=4",
+      "profile": "https://github.com/aaronjbrown",
+      "contributions": [
+        "code",
+        "doc",
+        "ideas",
+        "test"
+      ]
     }
   ],
   "contributorsPerLine": 7,
