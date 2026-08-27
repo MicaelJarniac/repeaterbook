@@ -33,7 +33,7 @@ __all__: tuple[str, ...] = (
 )
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from pathlib import Path
@@ -313,7 +313,9 @@ def repeater_to_specs(
             use=RepeaterUse[rep.use_membership.name],
             band=freq_to_band(rep.frequency),
             notes=rep.notes,
-            last_update=datetime.combine(rep.last_update, datetime.min.time()),
+            last_update=datetime.combine(
+                rep.last_update, datetime.min.time(), tzinfo=UTC
+            ),
             source_id=f"{rep.state_id}:{rep.repeater_id}",
             params=_ACCESSOR[mode](rep) or _DEFAULT_PARAMS[mode](),
         )
