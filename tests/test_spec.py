@@ -24,6 +24,7 @@ from repeaterbook.spec import (
     RepeaterUse,
     Tone,
     freq_to_band,
+    parse_node_id,
     parse_tone,
     repeater_spec_json_schema,
     repeater_to_specs,
@@ -56,6 +57,10 @@ def _spec(**overrides: object) -> RepeaterSpec:
         "use": RepeaterUse.OPEN,
         "band": "M_2",
         "notes": None,
+        "allstar_node": None,
+        "echolink_node": None,
+        "irlp_node": None,
+        "wires_node": None,
         "last_update": datetime(2026, 1, 1, tzinfo=UTC),
         "source_id": "QLD:42",
         "params": FmParams(bandwidth_khz=Decimal("25.0")),
@@ -140,6 +145,121 @@ def test_spec_last_update_serializes_as_rfc3339(
             "properties": {"last_update": {"type": "string", "format": "date-time"}},
         },
     )
+
+
+def test_linking_nodes_round_trip_through_json() -> None:
+    """The four linking-node fields should survive a serialize/parse cycle."""
+    spec = _spec(
+        allstar_node="12345",
+        echolink_node="67890",
+        irlp_node="4200",
+        wires_node="11111",
+    )
+    payload = json.loads(spec.model_dump_json())
+    assert payload["allstar_node"] == "12345"
+    assert payload["echolink_node"] == "67890"
+    assert payload["irlp_node"] == "4200"
+    assert payload["wires_node"] == "11111"
+    assert RepeaterSpec.model_validate_json(spec.model_dump_json()) == spec
+
+
+def test_linking_nodes_are_populated_from_repeater(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """Node ids stored on the Repeater must reach the spec, and not get crossed.
+
+    Distinct values per field: a mapper that wired `allstar_node` into
+    `irlp_node` would still pass if every field shared one value. See issue #52.
+    """
+    specs = repeater_to_specs(
+        sample_repeater(
+            allstar_node="12345",
+            echolink_node="67890",
+            irlp_node="4200",
+            wires_node="11111",
+        ),
+    )
+    spec = specs[0]
+    assert spec.allstar_node == "12345"
+    assert spec.echolink_node == "67890"
+    assert spec.irlp_node == "4200"
+    assert spec.wires_node == "11111"
+
+
+def test_linking_nodes_default_to_none(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """A repeater with no linking nodes should yield null node fields."""
+    spec = repeater_to_specs(sample_repeater())[0]
+    assert spec.allstar_node is None
+    assert spec.echolink_node is None
+    assert spec.irlp_node is None
+    assert spec.wires_node is None
+
+
+def test_zero_node_is_normalized_to_none(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """`"0"` is RepeaterBook's absent-node sentinel and must not reach the spec.
+
+    Real exports overwhelmingly carry `"AllStar Node": "0"` for repeaters with
+    no AllStar presence (see tests/test_api_format.py). Ingest's `or None` only
+    strips the empty string, so `"0"` reaches the stored Repeater; passing it
+    through would mean a non-null node field no longer implies a dialable node.
+    """
+    spec = repeater_to_specs(
+        sample_repeater(
+            allstar_node="0",
+            echolink_node="0",
+            irlp_node="0",
+            wires_node="0",
+        ),
+    )[0]
+    assert spec.allstar_node is None
+    assert spec.echolink_node is None
+    assert spec.irlp_node is None
+    assert spec.wires_node is None
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("12345", "12345"),
+        ("  12345  ", "12345"),
+        ("0", None),
+        ("00", None),
+        ("", None),
+        ("   ", None),
+        (None, None),
+        # A real id that merely starts with a zero must survive.
+        ("0123", "0123"),
+    ],
+)
+def test_parse_node_id(raw: str | None, expected: str | None) -> None:
+    """parse_node_id should strip whitespace and fold absent-node forms to None."""
+    assert parse_node_id(raw) == expected
+
+
+def test_linking_nodes_repeat_across_multi_mode_fanout(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """Every spec from one repeater carries that repeater's linking nodes.
+
+    A linking backend belongs to the repeater, not to one RF mode, so the FM and
+    DMR channels of a linked repeater both report it. Deliberately chosen over
+    nulling the fields on non-FM specs, which would add mode-specific logic to a
+    field group that is otherwise mode-agnostic.
+    """
+    specs = repeater_to_specs(
+        sample_repeater(
+            analog_capable=True,
+            dmr_capable=True,
+            echolink_node="67890",
+        ),
+    )
+    by_mode = {s.mode: s for s in specs}
+    assert set(by_mode) == {RepeaterMode.FM, RepeaterMode.DMR}
+    assert all(s.echolink_node == "67890" for s in specs)
 
 
 def test_extra_key_on_params_is_rejected() -> None:

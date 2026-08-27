@@ -415,6 +415,50 @@
       ],
       "title": "Notes"
     },
+    "allstar_node": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Allstar Node"
+    },
+    "echolink_node": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Echolink Node"
+    },
+    "irlp_node": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Irlp Node"
+    },
+    "wires_node": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Wires Node"
+    },
     "last_update": {
       "format": "date-time",
       "title": "Last Update",
@@ -494,6 +538,10 @@
     "use",
     "band",
     "notes",
+    "allstar_node",
+    "echolink_node",
+    "irlp_node",
+    "wires_node",
     "last_update",
     "source_id",
     "params",
