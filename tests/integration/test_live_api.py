@@ -72,7 +72,12 @@ async def test_live_export_rejects_unapproved_user_agent(
     live_token: str,
     tmp_path: StdPath,
 ) -> None:
-    """Test a contact other than the default returns 403 ua_mismatch."""
+    """Test a contact other than the default returns 403 ua_mismatch.
+
+    Pins an undocumented remote constraint: RepeaterBook matches the approved
+    application's User-Agent literally. A failure here is not necessarily a
+    regression on our side -- it may mean the policy was relaxed.
+    """
     api = RepeaterBookAPI(
         app_token=live_token,
         app_contact="unapproved@example.com",

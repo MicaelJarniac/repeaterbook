@@ -110,7 +110,7 @@ def _get_context() -> _Context:
     """Build (once) the API client and DB handle this server's tools share."""
     # `model_validate({})` rather than `RepeaterBookSettings()`: both read the
     # environment, but only this form tells a type checker that the required
-    # `app_contact` is supplied at runtime rather than by the caller.
+    # `app_token` is supplied at runtime rather than by the caller.
     settings = RepeaterBookSettings.model_validate({})
     # The working dir is this server's to own: it is where we put the SQLite
     # file and the HTTP cache, so create it rather than demanding it exist.
