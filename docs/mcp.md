@@ -41,15 +41,15 @@ directly and installs whatever commands it provides.
 | Variable | Purpose | Default |
 |---|---|---|
 | `REPEATERBOOK_WORKING_DIR` | Where the SQLite DB + cache live. Created if missing; a leading `~` is expanded. | `.` |
-| `REPEATERBOOK_APP_CONTACT` | Contact email for the API `User-Agent`. **Required** | — |
+| `REPEATERBOOK_APP_CONTACT` | Contact address in the API `User-Agent`. | the registered address |
 | `REPEATERBOOK_APP_TOKEN` | Per-user `rbuapp_` API token. **Required** | — |
 
-Neither of the last two has a default, and the server refuses to start
-without them.
+`REPEATERBOOK_APP_TOKEN` has no default, and the server refuses to start
+without it.
 
-`REPEATERBOOK_APP_CONTACT` is required because RepeaterBook's terms of use
-oblige callers to identify themselves; a placeholder address would quietly
-misidentify every request.
+`REPEATERBOOK_APP_CONTACT` defaults to the address this library is registered
+with. Set it only if you registered your own application with RepeaterBook —
+another value returns `403 ua_mismatch`.
 
 `REPEATERBOOK_APP_TOKEN` is required because, as of RepeaterBook's
 [2026-03-03 API policy](https://www.repeaterbook.com/wiki/doku.php?id=api),
@@ -70,7 +70,6 @@ Invoke it through `uvx`, which needs nothing installed up front:
       "args": ["--from", "repeaterbook[mcp]", "repeaterbook-mcp"],
       "env": {
         "REPEATERBOOK_WORKING_DIR": "~/.repeaterbook",
-        "REPEATERBOOK_APP_CONTACT": "you@example.com",
         "REPEATERBOOK_APP_TOKEN": "rbuapp_..."
       }
     }

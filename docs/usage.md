@@ -35,13 +35,21 @@ from repeaterbook.services import RepeaterBookAPI
 
 api = RepeaterBookAPI(
     app_token=os.environ["REPEATERBOOK"],
+)
+```
+
+The `app_name`, `app_version`, and `app_contact` values form the `User-Agent`, and they default to the identity this library is registered with. Leave them alone unless you registered your own application with RepeaterBook: the API matches an approved application's `User-Agent` literally, so changing any of the three — including setting `app_contact` to your own address — returns `403 ua_mismatch`.
+
+If you did register your own application, override all three to match what you registered, byte for byte:
+
+```python
+api = RepeaterBookAPI(
+    app_token=os.environ["REPEATERBOOK"],
     app_name="my-app",
     app_version="1.0.0",
     app_contact="you@example.org",
 )
 ```
-
-The `app_name`, `app_version`, and `app_contact` values form the `User-Agent` that RepeaterBook uses to identify your application; provide accurate values, as generic or mismatched user agents may be rejected.
 
 !!! warning "Never share or distribute a token"
     This library is a *distributed* client: each user must request and use their own `rbuapp_...` token. Do not embed a shared `app_...` token in source code, installers, or public repositories.

@@ -147,7 +147,8 @@ def mcp_env(
 
     def _configure(token: str | None = "rbuapp_test", **env: str) -> None:
         monkeypatch.setenv("REPEATERBOOK_WORKING_DIR", str(tmp_path))
-        monkeypatch.setenv("REPEATERBOOK_APP_CONTACT", "test@example.com")
+        # Unset so an ambient value can't change the User-Agent under test.
+        monkeypatch.delenv("REPEATERBOOK_APP_CONTACT", raising=False)
         if token is None:
             monkeypatch.delenv("REPEATERBOOK_APP_TOKEN", raising=False)
         else:

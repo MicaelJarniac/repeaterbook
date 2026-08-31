@@ -67,11 +67,12 @@ class RepeaterBookSettings(BaseSettings):
     working_dir: pathlib.Path = pathlib.Path()
     """Where the SQLite DB and HTTP cache live. Created on first use."""
 
-    app_contact: EmailStr
+    app_contact: EmailStr | None = None
     """Contact address for the API User-Agent.
 
-    Required: RepeaterBook's terms of use oblige callers to identify
-    themselves, so there is no honest default to fall back to.
+    Unset, the client keeps the address this library is registered with.
+    Set it only when running your own registered application; another value
+    returns 403 ua_mismatch.
     """
 
     app_token: SecretStr
@@ -109,19 +110,20 @@ def _get_context() -> _Context:
     """Build (once) the API client and DB handle this server's tools share."""
     # `model_validate({})` rather than `RepeaterBookSettings()`: both read the
     # environment, but only this form tells a type checker that the required
-    # `app_contact` is supplied at runtime rather than by the caller.
+    # `app_token` is supplied at runtime rather than by the caller.
     settings = RepeaterBookSettings.model_validate({})
     # The working dir is this server's to own: it is where we put the SQLite
     # file and the HTTP cache, so create it rather than demanding it exist.
     settings.working_dir.mkdir(parents=True, exist_ok=True)
     working_dir = Path(settings.working_dir)
     api = RepeaterBookAPI(
-        app_contact=settings.app_contact,
         # Stays a SecretStr end to end: RepeaterBookAPI masks it in its repr
         # and only unwraps it when building the X-RB-App-Token header.
         app_token=settings.app_token,
         working_dir=working_dir,
     )
+    if settings.app_contact is not None:
+        api = attrs.evolve(api, app_contact=settings.app_contact)
     db = RepeaterBook(working_dir=working_dir)
     db.init_db()
     return _Context(api=api, db=db)

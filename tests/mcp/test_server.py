@@ -11,6 +11,7 @@ from repeaterbook.exceptions import RepeaterBookUnauthorizedError
 from repeaterbook.mcp import server, service
 from repeaterbook.models import ExportQuery, Mode
 from repeaterbook.na_states import NAState, state_country
+from repeaterbook.services import RepeaterBookAPI
 from repeaterbook.spec import RepeaterMode
 
 if TYPE_CHECKING:
@@ -144,18 +145,23 @@ def test_missing_token_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
         server.RepeaterBookSettings.model_validate({})
 
 
-def test_missing_contact_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test the server refuses to start without a contact address.
+def test_missing_contact_keeps_approved_identity(mcp_env: McpEnvFactory) -> None:
+    """Test an unset contact leaves the default User-Agent unchanged."""
+    mcp_env()
 
-    RepeaterBook's terms require callers to identify themselves, so there is
-    no honest default; a placeholder would quietly misidentify every request.
-    """
-    monkeypatch.delenv("REPEATERBOOK_APP_CONTACT", raising=False)
-    monkeypatch.setenv("REPEATERBOOK_APP_TOKEN", "rbuapp_test")
-    server._get_context.cache_clear()  # noqa: SLF001
+    api = server._get_context().api  # noqa: SLF001
 
-    with pytest.raises(ValidationError, match="app_contact"):
-        server.RepeaterBookSettings.model_validate({})
+    assert api.app_contact == RepeaterBookAPI().app_contact
+    assert api.headers["User-Agent"] == RepeaterBookAPI().headers["User-Agent"]
+
+
+def test_contact_override_reaches_user_agent(mcp_env: McpEnvFactory) -> None:
+    """Test an explicit contact replaces the default in the User-Agent."""
+    mcp_env(REPEATERBOOK_APP_CONTACT="ops@example.org")
+
+    headers = server._get_context().api.headers  # noqa: SLF001
+
+    assert headers["User-Agent"].endswith("(+ops@example.org)")
 
 
 def test_malformed_contact_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
