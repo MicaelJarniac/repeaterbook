@@ -62,3 +62,27 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         if: steps.release.outputs.released == 'true'
+
+      # Must run after the PyPI upload: the registry validates that the
+      # server.json package version actually exists on PyPI, and reads the
+      # `mcp-name:` ownership token out of the rendered package description.
+      # `login github-oidc` needs the `id-token: write` permission granted
+      # above, and mints `io.github.<repository_owner>/*` -- which is why the
+      # `name` in server.json must match the owner's casing exactly.
+      - name: Publish to MCP Registry
+        if: steps.release.outputs.released == 'true'
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
+            | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          # A freshly uploaded release can take a moment to become visible in
+          # PyPI's metadata API, which surfaces as a validation failure rather
+          # than a transient network error, so retry before giving up.
+          for attempt in 1 2 3 4 5; do
+            if ./mcp-publisher publish; then
+              exit 0
+            fi
+            echo "Publish attempt $attempt failed; retrying in 30s..."
+            sleep 30
+          done
+          exit 1

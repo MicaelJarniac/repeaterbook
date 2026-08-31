@@ -167,6 +167,11 @@ That exposes three tools — `sync_repeaters`, `search_repeaters`, and
 **[MCP Server guide](mcp.md)** for the full tool reference, filter vocabulary,
 and configuration options.
 
+<!-- Ownership token for the MCP Registry: must match `name` in server.json.
+     The registry reads it from this file as rendered into the PyPI package
+     description, so keep it on its own line. -->
+<!-- mcp-name: io.github.MicaelJarniac/repeaterbook -->
+
 ## Documentation
 
 - **[Getting Started](getting-started.md)** - Tutorial for beginners
