@@ -51,6 +51,19 @@
         "ideas",
         "test"
       ]
+    },
+    {
+      "login": "erica-morton",
+      "name": "Erica Morton",
+      "avatar_url": "https://avatars.githubusercontent.com/u/162714130?v=4",
+      "profile": "https://ericamorton.name",
+      "contributions": [
+        "bug",
+        "code",
+        "doc",
+        "research",
+        "test"
+      ]
     }
   ],
   "contributorsPerLine": 7,
