@@ -426,11 +426,24 @@ class RepeaterBookAPI:
 
     Must read https://repeaterbook.com/wiki/doku.php?id=api before using.
 
+    Live exports need a per-user `rbuapp_` token. No application registration
+    is required: this library is registered with RepeaterBook as "RepeaterBook
+    Python Client" (App #114), so log in to your RepeaterBook account, open
+    https://www.repeaterbook.com/user/api_apps.php, find App #114, and
+    generate a token for it. The default app_name/app_version/app_contact are
+    the identity approved for that application, so a token generated this way
+    works without further configuration.
+
     Attributes:
         base_url: The RepeaterBook API base URL.
-        app_name: Application name for User-Agent header.
-        app_version: Application version for User-Agent header.
-        app_contact: Contact information for User-Agent header.
+        app_name: Application name for User-Agent header. Leave at the default
+            unless you registered your own application with RepeaterBook.
+        app_version: Application version for User-Agent header. Leave at the
+            default unless you registered your own application.
+        app_contact: Contact information for User-Agent header. Leave at the
+            default unless you registered your own application -- the API
+            matches an approved application's User-Agent literally, so setting
+            this to your own address returns 403 ua_mismatch.
         app_token: Optional per-user RepeaterBook API token, sent via the
             X-RB-App-Token header. Live exports require an approved
             rbuapp_ token as of RepeaterBook's 2026-03-03 API policy.

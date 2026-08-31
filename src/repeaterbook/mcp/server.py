@@ -70,9 +70,10 @@ class RepeaterBookSettings(BaseSettings):
     app_contact: EmailStr | None = None
     """Contact address for the API User-Agent.
 
-    Unset, the client keeps the address this library is registered with.
-    Set it only when running your own registered application; another value
-    returns 403 ua_mismatch.
+    Leave unset: it defaults to the address registered for App #114, and the
+    API matches an approved application's User-Agent literally, so any other
+    value returns 403 ua_mismatch. Set it only when running your own separate
+    registered application.
     """
 
     app_token: SecretStr
@@ -82,6 +83,10 @@ class RepeaterBookSettings(BaseSettings):
     an approved ``rbuapp_`` token, and an unauthenticated request is refused
     with ``401 auth_missing``. Demanding it up front turns that into a
     startup error rather than a failure on the first tool call.
+
+    No application registration is needed. Log in to your RepeaterBook
+    account, open https://www.repeaterbook.com/user/api_apps.php, find
+    "RepeaterBook Python Client" (App #114), and generate a token for it.
     """
 
     @field_validator("working_dir")

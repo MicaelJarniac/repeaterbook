@@ -9,6 +9,11 @@ extra. You don't normally install it yourself — point your MCP client at
 `uvx` and it will fetch and run the right version on demand, in its own
 isolated environment. See [Register with an MCP client](#register-with-an-mcp-client).
 
+You will need a free RepeaterBook account and an API token — see
+[Get an API token](#get-an-api-token). No application registration is
+required: the token is generated against this project's existing
+**App #114** entry.
+
 To install it anyway — to run it by hand, or to use the subpackage as a
 library:
 
@@ -36,27 +41,48 @@ library:
 (`repeaterbook`) have different names; `uv tool install` takes the package
 directly and installs whatever commands it provides.
 
+## Get an API token
+
+The server needs a RepeaterBook API token, and refuses to start without one.
+**You do not need to register an application** — this project is already
+registered with RepeaterBook, and the token you generate is issued against that
+existing registration:
+
+| Field | Value |
+|---|---|
+| Application | **RepeaterBook Python Client** |
+| Application ID | **App #114** |
+
+1. Create a free [RepeaterBook](https://www.repeaterbook.com/) account, or log
+   in to an existing one.
+2. Go to [API Applications](https://www.repeaterbook.com/user/api_apps.php).
+3. Find **RepeaterBook Python Client** (**App #114**) in the application list.
+4. Generate a token for it — a string starting with `rbuapp_`.
+5. Set it as `REPEATERBOOK_APP_TOKEN` in your MCP client config (below).
+
+The token is tied to your account, not to the application, so treat it as a
+secret and don't share it. The server's default `User-Agent` is the one
+registered for App #114, so the token works with no further configuration.
+
 ## Configuration (environment)
 
 | Variable | Purpose | Default |
 |---|---|---|
 | `REPEATERBOOK_WORKING_DIR` | Where the SQLite DB + cache live. Created if missing; a leading `~` is expanded. | `.` |
-| `REPEATERBOOK_APP_CONTACT` | Contact address in the API `User-Agent`. | the registered address |
+| `REPEATERBOOK_APP_CONTACT` | Contact address in the API `User-Agent`. Leave unset. | the registered address |
 | `REPEATERBOOK_APP_TOKEN` | Per-user `rbuapp_` API token. **Required** | — |
-
-`REPEATERBOOK_APP_TOKEN` has no default, and the server refuses to start
-without it.
-
-`REPEATERBOOK_APP_CONTACT` defaults to the address this library is registered
-with. Set it only if you registered your own application with RepeaterBook —
-another value returns `403 ua_mismatch`.
 
 `REPEATERBOOK_APP_TOKEN` is required because, as of RepeaterBook's
 [2026-03-03 API policy](https://www.repeaterbook.com/wiki/doku.php?id=api),
 every export needs an approved per-user `rbuapp_` token — an unauthenticated
-request is refused with `401 auth_missing`. Generate one from
-[API Applications](https://www.repeaterbook.com/user/api_apps.php) while
-logged in.
+request is refused with `401 auth_missing`. It has no default, so the server
+fails at startup rather than on the first tool call.
+
+Leave `REPEATERBOOK_APP_CONTACT` unset. It defaults to the address registered
+for App #114, and the API matches an approved application's `User-Agent`
+literally — setting it to your own address returns `403 ua_mismatch`, even with
+a valid token. Override it only if you registered your own separate application
+with RepeaterBook and hold a token for that.
 
 ## Register with an MCP client
 
@@ -101,6 +127,14 @@ That only works if the client can find `repeaterbook-mcp` on its `PATH`,
 which is not a given for GUI applications — they often don't inherit the
 `PATH` from your shell. Use an absolute path (`uv tool dir` will tell you
 where it landed) if the client can't find it.
+
+### Token troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Server exits at startup, `app_token` validation error | `REPEATERBOOK_APP_TOKEN` unset or empty | Set it in the client's `env` block |
+| `401 auth_invalid` | Token wrong, revoked, or expired | Regenerate it on [API Applications](https://www.repeaterbook.com/user/api_apps.php) |
+| `403 ua_mismatch` | `User-Agent` doesn't match the application the token was issued for | Unset `REPEATERBOOK_APP_CONTACT` |
 
 ## Tools
 

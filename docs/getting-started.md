@@ -52,12 +52,20 @@ To install the latest development version:
 
 ## Quick Start
 
-!!! note "You need an API token"
-    As of RepeaterBook's [2026-03-03 API policy](https://repeaterbook.com/wiki/doku.php?id=api), the API requires an approved per-user token (an `rbuapp_...` token). Generate one from your RepeaterBook account and expose it as the `REPEATERBOOK` environment variable. See the [Authentication guide](usage.md#authentication), and never share or distribute your token.
+### 0. Get an API token
+
+As of RepeaterBook's [2026-03-03 API policy](https://repeaterbook.com/wiki/doku.php?id=api), the API requires a per-user token (an `rbuapp_...` token). You don't have to register an application — this library is already registered as **RepeaterBook Python Client** (**App #114**):
+
+1. Create a free [RepeaterBook](https://www.repeaterbook.com/) account, or log in to an existing one.
+2. Go to [API Applications](https://www.repeaterbook.com/user/api_apps.php).
+3. Find **RepeaterBook Python Client** (**App #114**) and generate a token for it.
+4. Expose it to your shell:
 
 ```bash
 export REPEATERBOOK="rbuapp_your_token_here"
 ```
+
+The library's default `User-Agent` is the one registered for App #114, so the token works without any further configuration. See the [Authentication guide](usage.md#authentication) for details — and never share or distribute your token.
 
 ### 1. Download Repeater Data
 
