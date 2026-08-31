@@ -3,7 +3,7 @@
 Real-world examples of using the **RepeaterBook Python Client** for common amateur radio tasks.
 
 !!! note "API token required"
-    As of RepeaterBook's [2026-03-03 API policy](https://repeaterbook.com/wiki/doku.php?id=api), the API requires a per-user `rbuapp_...` token. For brevity, the examples below construct `RepeaterBookAPI()` without arguments — in practice, set the `REPEATERBOOK` environment variable and pass your token via `RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])`. See the [Authentication guide](usage.md#authentication).
+    As of RepeaterBook's [2026-03-03 API policy](https://repeaterbook.com/wiki/doku.php?id=api), the API requires a per-user `rbuapp_...` token. Generate one against this library's existing registration — **RepeaterBook Python Client** (**App #114**) — on [API Applications](https://www.repeaterbook.com/user/api_apps.php); no application registration of your own is needed. For brevity, the examples below construct `RepeaterBookAPI()` without arguments — in practice, set the `REPEATERBOOK` environment variable and pass your token via `RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])`. See the [Authentication guide](usage.md#authentication).
 
 ## Example 1: Build a Repeater Directory Website
 

@@ -34,7 +34,7 @@
       "environmentVariables": [
         {
           "name": "REPEATERBOOK_APP_TOKEN",
-          "description": "Per-user RepeaterBook 'rbuapp_' API token. Required: every export needs an approved token, and the server refuses to start without it. Generate one at https://www.repeaterbook.com/user/api_apps.php",
+          "description": "Per-user RepeaterBook 'rbuapp_' API token. Required: every export needs an approved token, and the server refuses to start without it. No application registration needed - log in to your RepeaterBook account, open https://www.repeaterbook.com/user/api_apps.php, find 'RepeaterBook Python Client' (App #114), and generate a token for it.",
           "isRequired": true,
           "isSecret": true
         },
@@ -45,7 +45,7 @@
         },
         {
           "name": "REPEATERBOOK_APP_CONTACT",
-          "description": "Contact address used in the API User-Agent. Defaults to the address this library is registered with; set it only if you registered your own application, as another value returns 403 ua_mismatch.",
+          "description": "Contact address used in the API User-Agent. Leave unset: it defaults to the address registered for App #114, and any other value returns 403 ua_mismatch. Set it only if you registered your own separate application with RepeaterBook.",
           "format": "string"
         }
       ]

@@ -14,13 +14,14 @@ The RepeaterBook Python Client is an unofficial, third-party Python library that
 
 ### Do I need an API key?
 
-Yes. As of RepeaterBook's [2026-03-03 API policy](https://www.repeaterbook.com/wiki/doku.php?id=api), the export endpoints require an approved per-user API token (an `rbuapp_...` token). Earlier releases of this library sent `Authorization: Bearer <token>`, which the live API now rejects with `401 auth_missing` — you must supply a token, and it is sent via the preferred `X-RB-App-Token` header.
+Yes. As of RepeaterBook's [2026-03-03 API policy](https://www.repeaterbook.com/wiki/doku.php?id=api), the export endpoints require an approved per-user API token (an `rbuapp_...` token), sent via the `X-RB-App-Token` header.
 
-To use the API:
+Getting one takes about a minute, and **you do not need to register an application** — this library is already registered as **RepeaterBook Python Client** (**App #114**):
 
-- Ask RepeaterBook to approve your application. This library is a *distributed* client, so each user must use their **own** token — see the [API policy](https://www.repeaterbook.com/wiki/doku.php?id=api).
-- Generate a personal token from your RepeaterBook account.
-- Pass it to `RepeaterBookAPI`, for example from an environment variable:
+1. Create a free [RepeaterBook](https://www.repeaterbook.com/) account, or log in to an existing one.
+2. Go to [API Applications](https://www.repeaterbook.com/user/api_apps.php).
+3. Find **RepeaterBook Python Client** (**App #114**) and generate a token for it.
+4. Pass the resulting `rbuapp_...` token to `RepeaterBookAPI`, ideally from an environment variable:
 
 ```python
 import os
@@ -30,7 +31,9 @@ from repeaterbook.services import RepeaterBookAPI
 api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
 ```
 
-**Never share or distribute a token.** RepeaterBook's policy prohibits embedding a shared `app_...` token in source code, installers, or public repositories.
+The default `User-Agent` already matches App #114, so the token works as-is — don't override `app_name`, `app_version`, or `app_contact`. See the [Authentication guide](usage.md#authentication) for details.
+
+**Never share or distribute a token.** This library is a *distributed* client: each user generates their **own** token against App #114. RepeaterBook's policy prohibits embedding a shared `app_...` token in source code, installers, or public repositories.
 
 Please also be respectful of their servers by:
 
@@ -319,6 +322,22 @@ rm repeaterbook.db
 ```
 
 ## API Questions
+
+### Why am I getting 401 or 403 from the API?
+
+| Error | Cause | Fix |
+|---|---|---|
+| `401 auth_missing` | No token was sent | Pass `app_token=os.environ["REPEATERBOOK"]` |
+| `401 auth_invalid` | Token wrong, revoked, or expired | Regenerate it on [API Applications](https://www.repeaterbook.com/user/api_apps.php) |
+| `403 ua_mismatch` | `User-Agent` doesn't match the application the token was issued for | Remove your `app_name` / `app_version` / `app_contact` overrides |
+
+`ua_mismatch` is the common one. A token generated against **RepeaterBook Python Client** (**App #114**) is only valid alongside that application's registered `User-Agent`, which this library sends by default. Overriding any part of it — even just `app_contact`, to your own address — breaks the match. See the [Authentication guide](usage.md#authentication).
+
+### Do I need to register my own application with RepeaterBook?
+
+No. This library ships registered as **RepeaterBook Python Client** (**App #114**); generate a token against it from [API Applications](https://www.repeaterbook.com/user/api_apps.php) and use the library's default `User-Agent`.
+
+Register your own only if you're building a separate product with its own identity. Then override `app_name`, `app_version`, and `app_contact` to match your registration exactly, and use a token issued for it.
 
 ### What's the difference between export.php and exportROW.php?
 

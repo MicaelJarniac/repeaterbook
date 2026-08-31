@@ -96,7 +96,7 @@ Welcome to the **RepeaterBook Python Client** documentation!
 
 ## Quick Example
 
-> This library requires a per-user RepeaterBook API token. [Request access](https://repeaterbook.com/wiki/doku.php?id=api), generate your token, and expose it as the `REPEATERBOOK` environment variable (for example `export REPEATERBOOK="rbuapp_..."`).
+> **You need a RepeaterBook API token.** No application registration required — this library is already registered as **RepeaterBook Python Client** (**App #114**). Log in to [RepeaterBook](https://www.repeaterbook.com/), open [API Applications](https://www.repeaterbook.com/user/api_apps.php), find **App #114**, and generate a token. Then expose it as the `REPEATERBOOK` environment variable (for example `export REPEATERBOOK="rbuapp_..."`). Keep the library's default `User-Agent` — see the [Authentication guide](usage.md#authentication).
 
 ```python
 import asyncio
@@ -154,13 +154,15 @@ client at `uvx` and nothing needs installing up front:
       "args": ["--from", "repeaterbook[mcp]", "repeaterbook-mcp"],
       "env": {
         "REPEATERBOOK_WORKING_DIR": "~/.repeaterbook",
-        "REPEATERBOOK_APP_CONTACT": "you@example.com",
         "REPEATERBOOK_APP_TOKEN": "rbuapp_..."
       }
     }
   }
 }
 ```
+
+`REPEATERBOOK_APP_TOKEN` is the same **App #114** token described above; the
+server won't start without it.
 
 That exposes three tools — `sync_repeaters`, `search_repeaters`, and
 `get_repeater` — returning a stable, source-agnostic repeater spec. See the
