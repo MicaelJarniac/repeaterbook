@@ -1,0 +1,54 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.MicaelJarniac/repeaterbook",
+  "title": "RepeaterBook",
+  "description": "Look up amateur radio repeaters from RepeaterBook.com by location, band, and mode.",
+  "version": "0.9.1",
+  "repository": {
+    "url": "https://github.com/MicaelJarniac/repeaterbook",
+    "source": "github"
+  },
+  "websiteUrl": "https://repeaterbook.readthedocs.io/en/latest/mcp/",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "repeaterbook",
+      "version": "0.9.1",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--from",
+          "value": "repeaterbook[mcp]",
+          "description": "The console script (repeaterbook-mcp) and the distribution (repeaterbook) have different names, and the server lives behind the 'mcp' extra."
+        },
+        {
+          "type": "positional",
+          "value": "repeaterbook-mcp"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "REPEATERBOOK_APP_TOKEN",
+          "description": "Per-user RepeaterBook 'rbuapp_' API token. Required: every export needs an approved token, and the server refuses to start without it. Generate one at https://www.repeaterbook.com/user/api_apps.php",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "REPEATERBOOK_WORKING_DIR",
+          "description": "Where the SQLite database and HTTP cache live. Created if missing; a leading '~' is expanded.",
+          "default": "."
+        },
+        {
+          "name": "REPEATERBOOK_APP_CONTACT",
+          "description": "Contact address used in the API User-Agent. Defaults to the address this library is registered with; set it only if you registered your own application, as another value returns 403 ua_mismatch.",
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}
