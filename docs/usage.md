@@ -104,11 +104,12 @@ The `download()` method fetches repeater data from the API:
 
 ```python
 import asyncio
+import os
 from repeaterbook.models import ExportQuery
 import pycountry
 
 async def download_example():
-    api = RepeaterBookAPI()
+    api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
 
     # Download by country
     germany = pycountry.countries.get(name="Germany")
@@ -143,9 +144,11 @@ repeaters = asyncio.run(download_example())
 
 The API client automatically caches responses to reduce load on RepeaterBook.com's servers and improve performance:
 
-- Default cache directory: `.repeaterbook_cache/`
+- Default cache directory: `.repeaterbook_cache/`, relative to `working_dir`
 - Default cache TTL: 3600 seconds (1 hour)
-- Cache is based on the query parameters
+- Cache is keyed on a hash of the full request URL, one entry per URL. A query
+  that fans out to both the North America and Rest-of-World endpoints therefore
+  produces two entries.
 
 ```python
 # First call downloads from API (slow)
@@ -163,14 +166,14 @@ repeaters3 = await api.download(query=ExportQuery(countries={argentina}))
 Long downloads automatically display progress bars using `tqdm`:
 
 ```python
-# Progress bar shows automatically for large downloads
-# Downloading repeaters: 100%|████████████| 1234/1234 [00:05<00:00, 245.67it/s]
+# The bar measures bytes downloaded, not repeater records:
+# 4.51MB [00:05, 892kB/s]
 repeaters = await api.download(query=ExportQuery(countries={usa}))
 ```
 
 ### Export Queries
 
-The `ExportQuery` dataclass specifies what data to download:
+The frozen `ExportQuery` class specifies what data to download:
 
 ```python
 from repeaterbook.models import ExportQuery
@@ -225,17 +228,18 @@ Use `populate()` to add repeaters to the database:
 rb.populate(repeaters)
 
 # Populate from API directly
+import os
 from repeaterbook.services import RepeaterBookAPI
 import pycountry
 
-api = RepeaterBookAPI()
+api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
 italy = pycountry.countries.get(name="Italy")
 repeaters = await api.download(query=ExportQuery(countries={italy}))
 rb.populate(repeaters)
 ```
 
 The `populate()` method intelligently merges data:
-- Uses the `id` field to detect duplicates
+- Detects duplicates by the composite primary key, `state_id` + `repeater_id`
 - Updates existing records if they've changed
 - Adds new records
 
@@ -367,7 +371,7 @@ from repeaterbook.queries import Bands, band
 # Available bands
 # Bands.M_10   # 10 meters (28-29.7 MHz)
 # Bands.M_6    # 6 meters (50-54 MHz)
-# Bands.M_4    # 4 meters (70-70.5 MHz)
+# Bands.M_4    # 4 meters (70-72 MHz)
 # Bands.M_2    # 2 meters (144-148 MHz)
 # Bands.CM_70  # 70 centimeters (420-450 MHz)
 # Bands.CM_33  # 33 centimeters (902-928 MHz)
@@ -473,14 +477,18 @@ closed = rb.query(Repeater.use_membership == Use.CLOSED)
 Filter by required access tones:
 
 ```python
-# Repeaters with CTCSS tone
-with_tone = rb.query(Repeater.pl_ctcss_uplink != None)
+# The tone fields are strings, not numbers: RepeaterBook packs both CTCSS
+# frequencies ("110.9") and DCS codes ("D023") into the same column. Compare
+# against strings, and match the exact spelling stored.
+
+# Repeaters with a tone
+with_tone = rb.query(Repeater.pl_ctcss_uplink.is_not(None))
 
 # Specific CTCSS tone
-tone_110_9 = rb.query(Repeater.pl_ctcss_uplink == 110.9)
+tone_110_9 = rb.query(Repeater.pl_ctcss_uplink == "110.9")
 
 # No tone required
-no_tone = rb.query(Repeater.pl_ctcss_uplink == None)
+no_tone = rb.query(Repeater.pl_ctcss_uplink.is_(None))
 ```
 
 ## Status Filtering
@@ -502,27 +510,36 @@ unknown = rb.query(Repeater.operational_status == Status.UNKNOWN)
 
 ### Emergency Services
 
+These four columns are strings, and the North America export sets them to
+`"Yes"` **or `"No"`** — not to null when a service is unsupported. So a null
+check matches every row, and `== True` matches none: compare to `"Yes"`.
+
 ```python
 # Repeaters with ARES support
-ares = rb.query(Repeater.ares != None)
+ares = rb.query(Repeater.ares == "Yes")
 
 # Repeaters with RACES support
-races = rb.query(Repeater.races != None)
+races = rb.query(Repeater.races == "Yes")
 
 # Repeaters with SKYWARN support
-skywarn = rb.query(Repeater.skywarn != None)
+skywarn = rb.query(Repeater.skywarn == "Yes")
 
 # Repeaters with CANWARN support
-canwarn = rb.query(Repeater.canwarn != None)
+canwarn = rb.query(Repeater.canwarn == "Yes")
 
 # Any emergency services
 emergency = rb.query(
-    (Repeater.ares != None) |
-    (Repeater.races != None) |
-    (Repeater.skywarn != None) |
-    (Repeater.canwarn != None)
+    (Repeater.ares == "Yes") |
+    (Repeater.races == "Yes") |
+    (Repeater.skywarn == "Yes") |
+    (Repeater.canwarn == "Yes")
 )
 ```
+
+!!! note "Rest-of-world exports omit these fields"
+    `exportROW.php` does not send `ARES`/`RACES`/`SKYWARN`/`CANWARN` at all, so
+    for non-NA repeaters they are `None` rather than `"No"`. Treat `None` as
+    "unknown", not as "unsupported".
 
 ## Combining Queries
 
@@ -621,11 +638,11 @@ with open('chirp_import.csv', 'w', newline='') as f:
     # filter_radius returns repeaters sorted by distance
     # Calculate distance for each repeater for display
     from haversine import haversine
-    for rep in nearby:
+    for idx, rep in enumerate(nearby, start=1):
         distance = haversine(radius.origin, (rep.latitude, rep.longitude), unit=radius.unit)
         writer.writerow([
-            rep.id,
-            rep.callsign,
+            idx,  # Chirp's "Location" is a channel slot number
+            rep.callsign or '',
             rep.frequency,
             '+' if rep.input_frequency < rep.frequency else '-',
             abs(rep.frequency - rep.input_frequency),
@@ -644,24 +661,29 @@ with open('chirp_import.csv', 'w', newline='') as f:
 Key fields available on `Repeater` objects:
 
 ```python
-# Identification
-rep.id              # Unique RepeaterBook ID
-rep.callsign        # Repeater callsign
+# Identification. The primary key is the (state_id, repeater_id) pair --
+# there is no single `id` field.
+rep.state_id        # RepeaterBook state/province ID (e.g. "06")
+rep.repeater_id     # RepeaterBook repeater ID, unique within that state
+rep.callsign        # Repeater callsign (may be None)
 rep.location_nearest_city  # City/location description
 
 # Frequency
 rep.frequency       # Output frequency (MHz)
 rep.input_frequency # Input frequency (MHz)
 
-# Access (CTCSS tones)
-rep.pl_ctcss_uplink        # Input CTCSS/PL tone (Hz)
-rep.pl_ctcss_tsq_downlink  # Output CTCSS/TSQ tone (Hz)
+# Access tones. Strings, not numbers -- may hold a CTCSS frequency
+# ("110.9") or a DCS code ("D023"), or be None.
+rep.pl_ctcss_uplink        # Input CTCSS/PL tone
+rep.pl_ctcss_tsq_downlink  # Output CTCSS/TSQ tone
 
 # Status
 rep.operational_status  # ON_AIR, OFF_AIR, UNKNOWN
 rep.use_membership      # OPEN, PRIVATE, CLOSED
 
 # Emergency Services (string fields)
+# Emergency services. Strings: "Yes"/"No" on North America exports, and
+# None on rest-of-world exports, which omit these fields entirely.
 rep.ares            # ARES support indicator
 rep.races           # RACES support indicator
 rep.skywarn         # SKYWARN support indicator
@@ -693,14 +715,15 @@ rep.notes           # Additional information
 ```python
 def describe_repeater(rep):
     """Print a detailed description of a repeater."""
-    print(f"=== {rep.callsign} ===")
+    print(f"=== {rep.callsign or rep.location_nearest_city} ===")
     print(f"Frequency: {rep.frequency:.4f} MHz ({rep.input_frequency:.4f} MHz)")
     print(f"Location: {rep.location_nearest_city}")
     print(f"Coordinates: {rep.latitude:.4f}, {rep.longitude:.4f}")
 
-    # Access
+    # Access. The field is a string and may be a DCS code, so don't label
+    # it as Hz unconditionally.
     if rep.pl_ctcss_uplink:
-        print(f"CTCSS: {rep.pl_ctcss_uplink} Hz")
+        print(f"Tone: {rep.pl_ctcss_uplink}")
 
     # Modes
     modes = []
@@ -709,13 +732,17 @@ def describe_repeater(rep):
     if rep.dmr_capable:
         modes.append(f"DMR (CC{rep.dmr_color_code})")
     if rep.apco_p_25_capable:
-        modes.append(f"P25 (NAC ${rep.p_25_nac:03X})")
+        # `p_25_nac` is a string as published, not an int -- don't format it
+        # with a numeric spec.
+        modes.append(f"P25 (NAC {rep.p_25_nac})")
     if rep.nxdn_capable:
         modes.append("NXDN")
 
     print(f"Modes: {', '.join(modes)}")
-    print(f"Status: {rep.operational_status.value}")
-    print(f"Access: {rep.use_membership.value}")
+    # `Status` and `Use` are plain enums built with `auto()`, so `.value` is an
+    # integer. Use `.name` for a readable label.
+    print(f"Status: {rep.operational_status.name}")
+    print(f"Access: {rep.use_membership.name}")
 
     if rep.notes:
         print(f"Notes: {rep.notes}")
@@ -792,21 +819,22 @@ The RepeaterBook Python Client provides custom exceptions for robust error handl
 from repeaterbook import (
     RepeaterBookError,
     RepeaterBookAPIError,
-    RepeaterBookCacheError,
+    RepeaterBookRateLimitError,
     RepeaterBookValidationError,
 )
 
 try:
     repeaters = await api.download(query=ExportQuery(countries={brazil}))
+except RepeaterBookRateLimitError as e:
+    # HTTP 429 -- carries `retry_after` when the API supplies it.
+    # Must precede RepeaterBookAPIError, being a subclass of it.
+    print(f"Rate limited, retry after {e.retry_after}s")
 except RepeaterBookAPIError as e:
-    # API returned an error response
+    # Any other API error response
     print(f"API error: {e}")
 except RepeaterBookValidationError as e:
     # Invalid response format or data
     print(f"Validation error: {e}")
-except RepeaterBookCacheError as e:
-    # Cache read/write failed
-    print(f"Cache error: {e}")
 except RepeaterBookError as e:
     # Catch all library errors
     print(f"RepeaterBook error: {e}")
@@ -817,13 +845,13 @@ except RepeaterBookError as e:
 | Exception | Description |
 |-----------|-------------|
 | `RepeaterBookError` | Base exception for all library errors |
-| `RepeaterBookAPIError` | API returned an error response |
+| `RepeaterBookAPIError` | Any HTTP 4xx/5xx other than 401/403/429, or a 200 response whose body reports an error |
 | `RepeaterBookUnauthorizedError` | HTTP 401 — missing or invalid app token |
 | `RepeaterBookForbiddenError` | HTTP 403 — User-Agent or authorization denied |
 | `RepeaterBookRateLimitError` | HTTP 429 — rate limited; carries `retry_after` |
 | `RepeaterBookValidationError` | Invalid data or response format |
 | `RepeaterBookRowError` | A single export row could not be modelled |
-| `RepeaterBookCacheError` | Cache operations failed |
+| `RepeaterBookCacheError` | Reserved for cache read/write failures. Not currently raised — an unreadable or corrupt cache entry is treated as a miss and refetched |
 
 `RepeaterBookUnauthorizedError`, `RepeaterBookForbiddenError` and
 `RepeaterBookRateLimitError` are subclasses of `RepeaterBookAPIError`;

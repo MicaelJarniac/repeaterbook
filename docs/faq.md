@@ -69,7 +69,20 @@ RepeaterBook covers repeaters worldwide. Major coverage includes:
 - **South America**: Brazil, Argentina, Chile, and others
 - **Africa**: South Africa and others
 
-Use `pycountry` to find the correct country codes.
+`ExportQuery.countries` takes `pycountry` country objects, and the query sends
+each country's **name** — so the lookup has to succeed before the query can.
+`pycountry.countries.get(name=...)` matches the official name exactly and
+returns `None` otherwise, which is easy to trip over:
+
+```python
+import pycountry
+
+pycountry.countries.get(name="South Korea")        # -> None
+pycountry.countries.search_fuzzy("South Korea")[0] # -> Korea, Republic of
+```
+
+Prefer `get(alpha_2="KR")` when you know the code, and fall back to
+`search_fuzzy()` for free-form names.
 
 ## Installation Issues
 
@@ -207,15 +220,24 @@ radius = Radius(origin=location, distance=1)  # Only 1 km!
 The cache should work automatically. To debug:
 
 ```python
-# Check cache directory
-api = RepeaterBookAPI()
-print(f"Cache dir: {api.cache_dir}")
-
-# Verify cache files exist
+import asyncio
 import os
-if os.path.exists(".repeaterbook_cache"):
-    files = os.listdir(".repeaterbook_cache")
-    print(f"Cache files: {files}")
+
+from repeaterbook.services import RepeaterBookAPI
+
+async def inspect_cache():
+    api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
+
+    # `cache_dir()` is an async method -- it creates the directory on first
+    # call -- not a plain attribute.
+    cache = await api.cache_dir()
+    print(f"Cache dir: {cache}")
+
+    # Entries are named `api_cache_<sha256-of-url>.json`, one per request URL.
+    # A query that fans out to both the NA and ROW endpoints yields two.
+    print(f"Cache files: {[p.name async for p in cache.iterdir()]}")
+
+asyncio.run(inspect_cache())
 ```
 
 To clear the cache:
@@ -296,10 +318,12 @@ results = rb.query(
 3. **Use LIMIT** for large result sets:
 
 ```python
-from sqlmodel import select
+from sqlmodel import Session, select
 
+# `RepeaterBook` opens a session per call internally and exposes the engine,
+# so build your own `Session` when you need a statement it can't express.
 statement = select(Repeater).limit(100)
-with rb.session as session:
+with Session(rb.engine) as session:
     results = session.exec(statement).all()
 ```
 
@@ -507,8 +531,9 @@ Quick start:
 ### How do I run tests?
 
 ```bash
-# Install dev dependencies
-uv sync --all-extras
+# Install dev dependencies. Dev tooling lives in dependency *groups*; the
+# `mcp` extra is separate, so ask for both.
+uv sync --all-extras --all-groups
 
 # Run tests
 pytest
@@ -523,7 +548,7 @@ pytest tests/test_repeaterbook.py
 ### How do I build documentation?
 
 ```bash
-cd docs/
+# Run from the repository root -- `mkdocs.yml` lives there, not in `docs/`.
 mkdocs serve  # Live preview at http://127.0.0.1:8000
 
 # Or using Nox
@@ -550,13 +575,13 @@ The RepeaterBook Python Client uses a hierarchy of custom exceptions:
 | Exception | When Raised |
 |-----------|------------|
 | `RepeaterBookError` | Base exception for all library errors |
-| `RepeaterBookAPIError` | API returned an error response (status: "error") |
+| `RepeaterBookAPIError` | Any HTTP 4xx/5xx other than 401/403/429, or a 200 response whose body reports an error |
 | `RepeaterBookUnauthorizedError` | HTTP 401 — missing or invalid app token |
 | `RepeaterBookForbiddenError` | HTTP 403 — User-Agent or authorization denied |
 | `RepeaterBookRateLimitError` | HTTP 429 — rate limited; carries `retry_after` |
 | `RepeaterBookValidationError` | Invalid data or response format |
 | `RepeaterBookRowError` | A single export row could not be modelled |
-| `RepeaterBookCacheError` | Cache read/write operations failed |
+| `RepeaterBookCacheError` | Reserved for cache read/write failures. Not currently raised — an unreadable or corrupt cache entry is treated as a miss and refetched |
 
 ### How do I handle errors properly?
 
@@ -653,16 +678,29 @@ SELECT * FROM repeater LIMIT 5;
 
 ### Verify API response
 
+The API rejects unauthenticated requests, so a raw check has to send the same
+identity the library does — both the approved `User-Agent` and the token.
+Reuse `api.headers` rather than hand-rolling them, so the `User-Agent` keeps
+matching the application your token was issued for:
+
 ```python
 import aiohttp
 import asyncio
+import os
+
+from repeaterbook.services import RepeaterBookAPI
 
 async def test_api():
+    api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
     url = "https://repeaterbook.com/api/export.php?country=Brazil"
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=dict(api.headers)) as session:
         async with session.get(url) as response:
             print(f"Status: {response.status}")
             data = await response.json()
+            # An error payload carries `status`/`message` instead of `results`.
+            if "results" not in data:
+                print(f"API error: {data}")
+                return
             print(f"Repeaters: {len(data['results'])}")
 
 asyncio.run(test_api())

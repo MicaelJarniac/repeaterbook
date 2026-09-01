@@ -107,7 +107,7 @@ MCP clients launch servers directly rather than through a shell, so
 `"command"` has to be something on the client's `PATH`. `uvx` usually is;
 a console script from a virtual environment usually isn't.
 
-To pin a version, put it in the `--from` spec — `repeaterbook[mcp]==0.8.0`.
+To pin a version, put it in the `--from` spec — `repeaterbook[mcp]==0.10.0`.
 
 If you'd rather have the command installed persistently, use
 `uv tool install` as above and then point the client straight at it:
@@ -215,7 +215,10 @@ not something to do on every search.
 
 Tools return **repeater-spec** rows — a neutral, source-agnostic shape carrying
 absolute rx/tx frequencies (the consuming radio derives duplex/offset). The JSON
-Schema is published at `repeaterbook/schemas/repeater_spec.schema.json`.
+Schema is published with the package at
+`repeaterbook/schemas/repeater_spec.schema.json` (`src/repeaterbook/…` in this
+repository), and `repeaterbook.spec.schema_path()` returns its installed
+location.
 
 ### Spec wire shape
 
@@ -225,24 +228,30 @@ which is a union discriminated on its own `mode` field:
 ```json
 {
   "name": "VK4RDM",
+  "callsign": "VK4RDM",
+  "nearest_city": "Brisbane",
   "rx_frequency_mhz": "439.000000",
   "tx_frequency_mhz": "434.000000",
-  "ctcss_tx_hz": null,
-  "ctcss_rx_hz": null,
+  "ctcss_tx_hz": "110.9",
+  "ctcss_rx_hz": "110.9",
   "dcs_tx_code": null,
   "dcs_rx_code": null,
-  "latitude": "-27.470000",
-  "longitude": "153.020000",
+  "latitude": "-27.470125",
+  "longitude": "153.021072",
   "distance_km": "12.345",
   "operational_status": "ON_AIR",
   "use": "OPEN",
+  "band": "CM_70",
+  "notes": null,
   "allstar_node": null,
-  "echolink_node": "67890",
+  "echolink_node": null,
   "irlp_node": null,
   "wires_node": null,
-  "last_update": "2026-01-01T00:00:00",
-  "mode": "DMR",
-  "params": { "mode": "DMR", "dmr_id": "5051", "color_code": "1" }
+  "last_update": "2026-01-01T00:00:00Z",
+  "source": "repeaterbook",
+  "source_id": "48:24371",
+  "params": { "mode": "DMR", "dmr_id": "505401", "color_code": "1" },
+  "mode": "DMR"
 }
 ```
 
