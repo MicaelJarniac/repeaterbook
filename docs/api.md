@@ -1,22 +1,66 @@
 # API Reference
 
-This page provides detailed API documentation for the RepeaterBook Python Client.
+Generated reference for the RepeaterBook Python Client.
 
-## Main Module
+Rendering options are configured globally in `mkdocs.yml`, so each section below
+just names the module it documents.
+
+## Package exports
+
+The names re-exported at the top level: the `Repeater` model, the `RepeaterBook`
+database handle, and the exception hierarchy. Everything else is imported from
+its own module.
 
 ::: repeaterbook
-    options:
-      show_root_heading: true
-      show_source: true
-      docstring_style: google
-      docstring_section_style: table
-      show_signature_annotations: true
-      separate_signature: true
-      merge_init_into_class: true
-      filters:
-        - "!^_"
-      members_order: source
-      group_by_category: true
-      show_category_heading: true
-      show_symbol_type_heading: true
-      show_symbol_type_toc: true
+
+## Models
+
+The `Repeater` ORM row, the API's JSON `TypedDict`s, and `ExportQuery`.
+
+::: repeaterbook.models
+
+## Services
+
+The API client, HTTP caching, endpoint routing, and JSON → model conversion.
+
+::: repeaterbook.services
+
+## Database
+
+SQLite persistence.
+
+::: repeaterbook.database
+
+## Queries
+
+Composable filter builders and the radius search.
+
+::: repeaterbook.queries
+
+## Spec
+
+`RepeaterSpec`, the neutral output contract, and its JSON Schema.
+
+::: repeaterbook.spec
+
+## Utils
+
+Geographic types and the constrained numeric aliases used across the contract.
+
+::: repeaterbook.utils
+
+## Exceptions
+
+::: repeaterbook.exceptions
+
+## North American state IDs
+
+RepeaterBook's own `state_id` vocabulary for the US, Canada and Mexico.
+
+::: repeaterbook.na_states
+
+## CSV export
+
+Reads RepeaterBook's CSV export format into `Repeater` rows.
+
+::: repeaterbook.csv_export

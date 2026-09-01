@@ -13,9 +13,14 @@
         - [`pre-commit-hooks`][pre-commit-hooks]
           - `check-toml`
           - `check-yaml`
+          - `check-json`
           - `end-of-file-fixer`
           - `trailing-whitespace`
           - `requirements-txt-fixer`
+        - `local`
+          - `repeaterbook-write-schema` — regenerates the published
+            `RepeaterSpec` JSON Schema when `spec.py`, `utils.py`, or the
+            schema itself changes
       </details>
     - [Semantic Pull Requests][semantic-pull-requests]
     - [semantic-release][semantic-release] (used indirectly)
@@ -28,7 +33,6 @@
     - [cruft][cruft] <sup>[config][pyproject_toml]</sup>
   - Type checking
     - [Mypy][mypy] <sup>[config][pyproject_toml]</sup>
-      - [Mypy Extensions][mypy-extensions]
   - Testing
     - [pytest][pytest] <sup>[config][pyproject_toml]</sup>
       - Plugins
@@ -73,24 +77,22 @@
 
 [codecov-project]: https://app.codecov.io/gh/MicaelJarniac/repeaterbook
 
-[_pre-commit-config_yaml]: ../.pre-commit-config.yaml
-[pyproject_toml]: ../pyproject.toml
-[_editorconfig]: ../.editorconfig
-[docs_mkdocs_yml]: ../mkdocs.yml
+[_pre-commit-config_yaml]: https://github.com/MicaelJarniac/repeaterbook/blob/main/.pre-commit-config.yaml
+[pyproject_toml]: https://github.com/MicaelJarniac/repeaterbook/blob/main/pyproject.toml
+[_editorconfig]: https://github.com/MicaelJarniac/repeaterbook/blob/main/.editorconfig
+[docs_mkdocs_yml]: https://github.com/MicaelJarniac/repeaterbook/blob/main/mkdocs.yml
 [docs_wordlist_txt]: ./wordlist.txt
-[noxfile_py]: ../noxfile.py
+[noxfile_py]: https://github.com/MicaelJarniac/repeaterbook/blob/main/noxfile.py
 
 [ruff]: https://github.com/astral-sh/ruff
 [pre-commit]: https://github.com/pre-commit/pre-commit
 [pre-commit-hooks]: https://github.com/pre-commit/pre-commit-hooks
-[rstcheck]: https://github.com/myint/rstcheck
 [semantic-pull-requests]: https://github.com/zeke/semantic-pull-requests
 [semantic-release]: https://github.com/semantic-release/semantic-release
 [python-semantic-release]: https://github.com/relekang/python-semantic-release
 [codecov]: https://codecov.io
 [codecov-action]: https://github.com/marketplace/actions/codecov
 [mypy]: https://github.com/python/mypy
-[mypy-extensions]: https://github.com/python/mypy_extensions
 [pytest]: https://github.com/pytest-dev/pytest
 [pytest-cov]: https://github.com/pytest-dev/pytest-cov
 [pytest-benchmark]: https://github.com/ionelmc/pytest-benchmark
