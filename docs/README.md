@@ -273,7 +273,8 @@ poetry add git+https://github.com/MicaelJarniac/repeaterbook
   - sqlmodel - SQL ORM with type safety
   - tqdm - Progress bars
   - yarl - URL handling
-- The optional `mcp` extra additionally installs `fastmcp` and `pydantic-settings`
+- The optional `mcp` extra additionally installs `fastmcp`, `pydantic-settings`,
+  and `pydantic[email]` (for the `EmailStr` contact setting)
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.

@@ -63,7 +63,7 @@ Here is a summary of the steps to follow:
 ```bash
 $ git checkout main
 $ git pull upstream main
-$ uv sync --all-extras
+$ uv sync --all-extras --all-groups
 ```
 3. Create a new topic branch (off the main project development branch) to contain your feature, change, or fix:
 ```bash
@@ -208,8 +208,9 @@ git clone https://github.com/MicaelJarniac/repeaterbook
 # Navigate to the newly cloned directory
 cd repeaterbook
 
-# Set up the environment
-uv sync --all-extras
+# Set up the environment. Dev tooling lives in dependency *groups*; the `mcp`
+# extra is separate, so ask for both.
+uv sync --all-extras --all-groups
 
 # Set up pre-commit hooks
 pre-commit install
@@ -255,8 +256,8 @@ nox -s docs
 # Serve documentation locally with live reload
 nox -s docs_serve
 
-# Or use mkdocs directly
-cd docs/
+# Or use mkdocs directly, from the repository root -- `mkdocs.yml` lives
+# there, not in `docs/`.
 mkdocs build --strict  # Build HTML docs
 mkdocs serve           # Serve with live reload at http://127.0.0.1:8000
 ```
@@ -275,7 +276,7 @@ To update installed packages, run `uv lock --upgrade-package <package name>`.
 
 Always lock the dependencies after updating them, by running `uv lock`.
 
-When updating development requirements, make sure to also update the related pre-commit hooks in [`.pre-commit-config.yaml`](../.pre-commit-config.yaml).
+When updating development requirements, make sure to also update the related pre-commit hooks in [`.pre-commit-config.yaml`](https://github.com/MicaelJarniac/repeaterbook/blob/main/.pre-commit-config.yaml).
 
 ### Updating template
 

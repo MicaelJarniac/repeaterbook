@@ -82,11 +82,13 @@ def search_repeaters():
     # Limit to first 50 results
     sorted_results = nearby[:50]
 
-    # Convert to JSON
+    # Convert to JSON. Frequencies and coordinates are `Decimal`, which the
+    # JSON encoder cannot serialize -- render them as strings to keep the
+    # exactness that `Decimal` was chosen for in the first place.
     from haversine import haversine
     return jsonify([{
         'callsign': r.callsign,
-        'frequency': r.frequency,
+        'frequency': str(r.frequency),
         'location': r.location_nearest_city,
         'distance': round(haversine(radius.origin, (r.latitude, r.longitude), unit=radius.unit), 2),
         'ctcss': r.pl_ctcss_uplink,
@@ -165,8 +167,9 @@ async def generate_codeplug():
             # Calculate offset
             offset = rep.frequency - rep.input_frequency
 
-            # Channel name
-            name = f"{rep.callsign} {rep.location_nearest_city[:20]}"
+            # Channel name. `callsign` is `str | None` on this
+            # community-maintained data, so fall back to the city.
+            name = f"{rep.callsign or rep.location_nearest_city} {rep.location_nearest_city[:20]}"
 
             writer.writerow([
                 idx,                          # No.
@@ -176,8 +179,8 @@ async def generate_codeplug():
                 'D-Digital',                  # Channel Type
                 'High',                       # Transmit Power
                 '12.5K',                      # Band Width
-                f"{rep.pl_ctcss_uplink:.1f}" if rep.pl_ctcss_uplink else '',  # CTCSS Decode
-                f"{rep.pl_ctcss_uplink:.1f}" if rep.pl_ctcss_uplink else '',  # CTCSS Encode
+                rep.pl_ctcss_uplink or '',    # CTCSS Decode
+                rep.pl_ctcss_uplink or '',    # CTCSS Encode
                 'Worldwide',                  # Contact
                 'Group Call',                 # Contact Call Type
                 'None',                       # Radio ID
@@ -185,7 +188,7 @@ async def generate_codeplug():
                 'Carrier',                    # Squelch Mode
                 'Off',                        # Optional Signal
                 '1',                          # DTMF ID
-                rep.dmr_color_code or 1,      # Color Code
+                rep.dmr_color_code or '1',    # Color Code (a string field)
                 '2',                          # Slot (usually TS2 for Worldwide)
                 'All',                        # Scan List
                 'Worldwide',                  # Group List
@@ -258,19 +261,21 @@ async def create_coverage_map():
             <p><b>Frequency:</b> {rep.frequency:.4f} MHz</p>
             <p><b>Location:</b> {rep.location_nearest_city}</p>
             <p><b>Input Tone:</b> {rep.pl_ctcss_uplink or 'None'}</p>
-            <p><b>Use:</b> {rep.use_membership.value}</p>
+            <p><b>Use:</b> {rep.use_membership.name}</p>
         </div>
         """
 
+        # folium serializes coordinates to JavaScript, which cannot encode
+        # `Decimal` -- convert to float on the way out.
         folium.Marker(
-            location=[rep.latitude, rep.longitude],
+            location=[float(rep.latitude), float(rep.longitude)],
             popup=folium.Popup(popup_html, max_width=250),
             tooltip=rep.callsign,
             icon=folium.Icon(color=color, icon=icon)
         ).add_to(m)
 
     # Add heatmap layer
-    heat_data = [[r.latitude, r.longitude] for r in operational]
+    heat_data = [[float(r.latitude), float(r.longitude)] for r in operational]
     HeatMap(heat_data, radius=15).add_to(m)
 
     # Save map
@@ -319,8 +324,12 @@ async def generate_statistics():
     # Query all repeaters
     all_data = rb.query()
 
-    # Convert to DataFrame
+    # Convert to DataFrame. `frequency` and the coordinates are `Decimal`,
+    # which pandas stores as `dtype=object` -- cast the columns you intend to
+    # plot or aggregate, or numpy will refuse to work on them.
     df = pd.DataFrame([r.model_dump() for r in all_data])
+    for col in ("frequency", "input_frequency", "latitude", "longitude"):
+        df[col] = df[col].astype(float)
 
     # Statistics
     print("=== Repeater Statistics ===\n")
@@ -547,10 +556,15 @@ async def emergency_planning():
     rb = RepeaterBook()
     rb.populate(repeaters)
 
-    # Find emergency-capable repeaters (ARES/RACES/SKYWARN)
+    # Find emergency-capable repeaters (ARES/RACES/SKYWARN).
+    # These are `str | None` columns holding values like "Yes" -- not booleans --
+    # so test for presence with `.is_not(None)`. Comparing them to `True` would
+    # silently match nothing.
     emergency_repeaters = rb.query(
         Repeater.operational_status == Status.ON_AIR,
-        (Repeater.ares == True) | (Repeater.races == True) | (Repeater.skywarn == True),
+        Repeater.ares.is_not(None)
+        | Repeater.races.is_not(None)
+        | Repeater.skywarn.is_not(None),
         Repeater.use_membership.in_([Use.OPEN, Use.PRIVATE])
     )
 
@@ -572,10 +586,13 @@ async def emergency_planning():
     for location, reps in sorted(by_location.items()):
         print(f"\n{location}:")
         for rep in sorted(reps, key=lambda r: r.frequency):
-            print(f"  {rep.callsign:10s} {rep.frequency:8.4f} MHz", end="")
+            # `callsign` is `str | None`, and the tone fields are strings that
+            # may hold a DCS code ("D023") as well as a CTCSS frequency --
+            # so pad them as strings, never with a numeric format spec.
+            print(f"  {rep.callsign or '-':10s} {rep.frequency:8.4f} MHz", end="")
             if rep.pl_ctcss_uplink:
-                print(f"  Tone: {rep.pl_ctcss_uplink:6.1f}", end="")
-            print(f"  Use: {rep.use_membership.value}")
+                print(f"  Tone: {rep.pl_ctcss_uplink:>6s}", end="")
+            print(f"  Use: {rep.use_membership.name}")
             if rep.notes:
                 print(f"    Notes: {rep.notes}")
 
@@ -596,7 +613,9 @@ async def emergency_planning():
         candidates = rb.query(
             square(radius),
             Repeater.operational_status == Status.ON_AIR,
-            (Repeater.ares == True) | (Repeater.races == True) | (Repeater.skywarn == True)
+            Repeater.ares.is_not(None)
+            | Repeater.races.is_not(None)
+            | Repeater.skywarn.is_not(None)
         )
         nearby = filter_radius(candidates, radius)
 

@@ -240,7 +240,9 @@ async def main():
     from haversine import haversine
     for rep in nearby_filtered[:10]:
         distance = haversine(radius.origin, (rep.latitude, rep.longitude), unit=radius.unit)
-        print(f"  {distance:5.1f}km - {rep.frequency:.4f} MHz - {rep.callsign:8s} - {rep.location_nearest_city}")
+        # `callsign` is optional on this community-maintained data, so give
+        # `None` a placeholder before padding it.
+        print(f"  {distance:5.1f}km - {rep.frequency:.4f} MHz - {rep.callsign or '-':8s} - {rep.location_nearest_city}")
 
 if __name__ == "__main__":
     asyncio.run(main())
