@@ -510,27 +510,36 @@ unknown = rb.query(Repeater.operational_status == Status.UNKNOWN)
 
 ### Emergency Services
 
+These four columns are strings, and the North America export sets them to
+`"Yes"` **or `"No"`** — not to null when a service is unsupported. So a null
+check matches every row, and `== True` matches none: compare to `"Yes"`.
+
 ```python
 # Repeaters with ARES support
-ares = rb.query(Repeater.ares != None)
+ares = rb.query(Repeater.ares == "Yes")
 
 # Repeaters with RACES support
-races = rb.query(Repeater.races != None)
+races = rb.query(Repeater.races == "Yes")
 
 # Repeaters with SKYWARN support
-skywarn = rb.query(Repeater.skywarn != None)
+skywarn = rb.query(Repeater.skywarn == "Yes")
 
 # Repeaters with CANWARN support
-canwarn = rb.query(Repeater.canwarn != None)
+canwarn = rb.query(Repeater.canwarn == "Yes")
 
 # Any emergency services
 emergency = rb.query(
-    (Repeater.ares != None) |
-    (Repeater.races != None) |
-    (Repeater.skywarn != None) |
-    (Repeater.canwarn != None)
+    (Repeater.ares == "Yes") |
+    (Repeater.races == "Yes") |
+    (Repeater.skywarn == "Yes") |
+    (Repeater.canwarn == "Yes")
 )
 ```
+
+!!! note "Rest-of-world exports omit these fields"
+    `exportROW.php` does not send `ARES`/`RACES`/`SKYWARN`/`CANWARN` at all, so
+    for non-NA repeaters they are `None` rather than `"No"`. Treat `None` as
+    "unknown", not as "unsupported".
 
 ## Combining Queries
 
@@ -673,6 +682,8 @@ rep.operational_status  # ON_AIR, OFF_AIR, UNKNOWN
 rep.use_membership      # OPEN, PRIVATE, CLOSED
 
 # Emergency Services (string fields)
+# Emergency services. Strings: "Yes"/"No" on North America exports, and
+# None on rest-of-world exports, which omit these fields entirely.
 rep.ares            # ARES support indicator
 rep.races           # RACES support indicator
 rep.skywarn         # SKYWARN support indicator

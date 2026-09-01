@@ -221,6 +221,9 @@ The cache should work automatically. To debug:
 
 ```python
 import asyncio
+import os
+
+from repeaterbook.services import RepeaterBookAPI
 
 async def inspect_cache():
     api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])

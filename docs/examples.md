@@ -557,14 +557,15 @@ async def emergency_planning():
     rb.populate(repeaters)
 
     # Find emergency-capable repeaters (ARES/RACES/SKYWARN).
-    # These are `str | None` columns holding values like "Yes" -- not booleans --
-    # so test for presence with `.is_not(None)`. Comparing them to `True` would
-    # silently match nothing.
+    # These columns are strings carrying "Yes" *or* "No" -- not booleans, and
+    # not null when unsupported. So compare to "Yes": `== True` matches
+    # nothing, and a null/truthiness test matches every row including the
+    # "No" ones.
     emergency_repeaters = rb.query(
         Repeater.operational_status == Status.ON_AIR,
-        Repeater.ares.is_not(None)
-        | Repeater.races.is_not(None)
-        | Repeater.skywarn.is_not(None),
+        (Repeater.ares == "Yes")
+        | (Repeater.races == "Yes")
+        | (Repeater.skywarn == "Yes"),
         Repeater.use_membership.in_([Use.OPEN, Use.PRIVATE])
     )
 
@@ -613,9 +614,9 @@ async def emergency_planning():
         candidates = rb.query(
             square(radius),
             Repeater.operational_status == Status.ON_AIR,
-            Repeater.ares.is_not(None)
-            | Repeater.races.is_not(None)
-            | Repeater.skywarn.is_not(None)
+            (Repeater.ares == "Yes")
+            | (Repeater.races == "Yes")
+            | (Repeater.skywarn == "Yes")
         )
         nearby = filter_radius(candidates, radius)
 
