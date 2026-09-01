@@ -351,5 +351,12 @@ async def get_repeater(source_id: str) -> list[RepeaterSpec]:
 
 
 def main() -> None:  # pragma: no cover - process entry point
-    """Run the MCP server over stdio."""
+    """Run the MCP server over stdio.
+
+    Builds the shared context up front so a missing or malformed
+    ``REPEATERBOOK_APP_TOKEN`` surfaces as a startup failure. Deferring it to
+    the first tool call would let the server advertise tools it cannot serve,
+    reporting the misconfiguration as a per-call error instead.
+    """
+    _get_context()
     mcp.run()
