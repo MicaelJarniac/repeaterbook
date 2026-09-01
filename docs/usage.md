@@ -819,6 +819,7 @@ The RepeaterBook Python Client provides custom exceptions for robust error handl
 from repeaterbook import (
     RepeaterBookError,
     RepeaterBookAPIError,
+    RepeaterBookCacheError,
     RepeaterBookRateLimitError,
     RepeaterBookValidationError,
 )
@@ -835,6 +836,9 @@ except RepeaterBookAPIError as e:
 except RepeaterBookValidationError as e:
     # Invalid response format or data
     print(f"Validation error: {e}")
+except RepeaterBookCacheError as e:
+    # The response could not be cached -- full disk, unwritable working dir
+    print(f"Cache error: {e}")
 except RepeaterBookError as e:
     # Catch all library errors
     print(f"RepeaterBook error: {e}")
@@ -851,7 +855,7 @@ except RepeaterBookError as e:
 | `RepeaterBookRateLimitError` | HTTP 429 — rate limited; carries `retry_after` |
 | `RepeaterBookValidationError` | Invalid data or response format |
 | `RepeaterBookRowError` | A single export row could not be modelled |
-| `RepeaterBookCacheError` | Reserved for cache read/write failures. Not currently raised — an unreadable or corrupt cache entry is treated as a miss and refetched |
+| `RepeaterBookCacheError` | The response could not be cached — a full disk or an unwritable working directory. A cache entry that is merely missing or corrupt is *not* an error: it is treated as a miss and refetched |
 
 `RepeaterBookUnauthorizedError`, `RepeaterBookForbiddenError` and
 `RepeaterBookRateLimitError` are subclasses of `RepeaterBookAPIError`;

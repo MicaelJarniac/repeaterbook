@@ -581,7 +581,7 @@ The RepeaterBook Python Client uses a hierarchy of custom exceptions:
 | `RepeaterBookRateLimitError` | HTTP 429 — rate limited; carries `retry_after` |
 | `RepeaterBookValidationError` | Invalid data or response format |
 | `RepeaterBookRowError` | A single export row could not be modelled |
-| `RepeaterBookCacheError` | Reserved for cache read/write failures. Not currently raised — an unreadable or corrupt cache entry is treated as a miss and refetched |
+| `RepeaterBookCacheError` | The response could not be cached — a full disk or an unwritable working directory. A cache entry that is merely missing or corrupt is *not* an error: it is treated as a miss and refetched |
 
 ### How do I handle errors properly?
 

@@ -19,7 +19,7 @@ import email.utils
 import hashlib
 import json
 import time
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from http import HTTPStatus
@@ -35,6 +35,7 @@ from yarl import URL
 
 from repeaterbook.exceptions import (
     RepeaterBookAPIError,
+    RepeaterBookCacheError,
     RepeaterBookForbiddenError,
     RepeaterBookRateLimitError,
     RepeaterBookRowError,
@@ -59,7 +60,7 @@ from repeaterbook.models import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Iterable, Iterator, Mapping
 
 
 IdentityHeaders = TypedDict(
@@ -144,6 +145,79 @@ def _error_for(
     )
 
 
+@contextmanager
+def _cache_errors(operation: str, path: Path) -> Iterator[None]:
+    """Surface `OSError` from a cache operation as `RepeaterBookCacheError`.
+
+    A full disk or a read-only working directory is a library-level failure,
+    and the public exception hierarchy promises it under a single name.
+
+    `aiohttp.ClientOSError` is re-raised untouched: it subclasses `OSError`,
+    but a connection dropped mid-stream is a *transport* failure that happens
+    to occur while the cache file is open, not a cache failure.
+
+    Args:
+        operation: What was being attempted, for the error message.
+        path: The cache path involved, for the error message.
+
+    Yields:
+        None. The wrapped block runs inside the handler.
+
+    Raises:
+        RepeaterBookCacheError: If the block raises `OSError`.
+    """
+    try:
+        yield
+    except aiohttp.ClientOSError:
+        raise
+    except OSError as exc:
+        msg = f"Failed to {operation} cache file {path}: {exc}"
+        raise RepeaterBookCacheError(msg) from exc
+
+
+async def _download_to_cache(
+    url: URL,
+    *,
+    headers: IdentityHeaders | None,
+    cache_file: Path,
+    temp_file: Path,
+    chunk_size: int,
+) -> None:
+    """Stream `url` into `temp_file`, then atomically rename it to `cache_file`.
+
+    Raises:
+        RepeaterBookAPIError: If the response is an HTTP error.
+        RepeaterBookCacheError: If the entry cannot be written or committed.
+    """
+    async with (
+        aiohttp.ClientSession(
+            headers=cast("dict[str, str] | None", headers)
+        ) as session,
+        session.get(url) as response,
+    ):
+        if response.status >= HTTPStatus.BAD_REQUEST:
+            body_text = await response.text()
+            raise _error_for(response.status, body_text, url, response.headers)
+        # Write to temp file first for atomic cache updates. The context
+        # manager spans the close, not just the writes: a buffered write on a
+        # full disk can fail at flush time.
+        with _cache_errors("write", temp_file):
+            async with await temp_file.open("wb") as f:
+                with tqdm(
+                    total=response.content_length,
+                    unit="B",
+                    unit_scale=True,
+                ) as progress:
+                    async for chunk in response.content.iter_chunked(chunk_size):
+                        await f.write(chunk)
+                        progress.update(len(chunk))
+
+    # Atomic rename from temp file to cache file. This prevents race conditions
+    # where concurrent requests might read a partially written cache file.
+    with _cache_errors("commit", temp_file):
+        await temp_file.rename(cache_file)
+
+
 async def fetch_json(
     url: URL,
     *,
@@ -158,6 +232,14 @@ async def fetch_json(
       not forced, it loads and returns the cached data.
     - Otherwise, it streams the data in chunks while displaying a progress bar, caches
       it, and returns the parsed JSON data.
+
+    A cache entry that is missing or unparseable is treated as a miss and refetched.
+    A failure to *write* the cache is an error, not a miss, and is raised as
+    `RepeaterBookCacheError` -- returning data the caller believes was cached
+    would silently refetch on every subsequent call.
+
+    Raises:
+        RepeaterBookCacheError: If the cache entry cannot be written or read back.
     """
     # Create a unique filename for caching based on the URL hash.
     if cache_dir is None:
@@ -176,33 +258,25 @@ async def fetch_json(
 
     # Cache doesn't exist or is invalid, continue to fetch
     logger.info("Fetching new data from API...")
-    async with (
-        aiohttp.ClientSession(
-            headers=cast("dict[str, str] | None", headers)
-        ) as session,
-        session.get(url) as response,
-    ):
-        if response.status >= HTTPStatus.BAD_REQUEST:
-            body_text = await response.text()
-            raise _error_for(response.status, body_text, url, response.headers)
-        # Write to temp file first for atomic cache updates.
-        async with await temp_file.open("wb") as f:
-            with tqdm(
-                total=response.content_length,
-                unit="B",
-                unit_scale=True,
-            ) as progress:
-                async for chunk in response.content.iter_chunked(chunk_size):
-                    await f.write(chunk)
-                    progress.update(len(chunk))
-
-    # Atomic rename from temp file to cache file.
-    # This prevents race conditions where concurrent requests might read
-    # a partially written cache file.
-    await temp_file.rename(cache_file)
+    try:
+        await _download_to_cache(
+            url,
+            headers=headers,
+            cache_file=cache_file,
+            temp_file=temp_file,
+            chunk_size=chunk_size,
+        )
+    except BaseException:
+        # Never leave a partial .tmp behind. It is not named as a cache entry
+        # so it would never be read, only accumulate. Cleanup failure is
+        # suppressed so it cannot mask the error that got us here.
+        with suppress(OSError):
+            await temp_file.unlink(missing_ok=True)
+        raise
 
     # After saving the file, load and parse the JSON data.
-    return json.loads(await cache_file.read_text(encoding="utf-8"))
+    with _cache_errors("read back", cache_file):
+        return json.loads(await cache_file.read_text(encoding="utf-8"))
 
 
 BOOL_MAP: Final[dict[str | int, bool]] = {
@@ -480,15 +554,27 @@ class RepeaterBookAPI:
     max_count: int = 3500
 
     async def cache_dir(self) -> Path:
-        """Cache directory for API responses."""
+        """Cache directory for API responses.
+
+        Returns:
+            The cache directory, created if it did not already exist.
+
+        Raises:
+            RepeaterBookCacheError: If the directory cannot be created, e.g. a
+                read-only working directory.
+        """
         cache = self.working_dir / ".repeaterbook_cache"
         if not await cache.exists():
             logger.info("Creating cache directory.")
-            await cache.mkdir(parents=True, exist_ok=True)
+            with _cache_errors("create", cache):
+                await cache.mkdir(parents=True, exist_ok=True)
             gitignore = cache / ".gitignore"
             if not await gitignore.exists():
                 logger.info("Creating .gitignore file.")
-                await gitignore.write_text("*\n", encoding="utf-8")
+                # Best-effort: the .gitignore is a courtesy to keep the cache
+                # out of a caller's repo, not something to fail a fetch over.
+                with suppress(OSError):
+                    await gitignore.write_text("*\n", encoding="utf-8")
         return cache
 
     @property
