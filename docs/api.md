@@ -64,3 +64,19 @@ RepeaterBook's own `state_id` vocabulary for the US, Canada and Mexico.
 Reads RepeaterBook's CSV export format into `Repeater` rows.
 
 ::: repeaterbook.csv_export
+
+## MCP server
+
+Requires the `mcp` extra. See the [MCP Server guide](mcp.md) for running it.
+
+### Server
+
+Configuration and the agent-facing tool declarations.
+
+::: repeaterbook.mcp.server
+
+### Service
+
+The orchestration layer the tools delegate to.
+
+::: repeaterbook.mcp.service
