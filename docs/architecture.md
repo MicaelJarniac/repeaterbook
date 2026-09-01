@@ -151,9 +151,17 @@ Writes go to a `.tmp` file and are then renamed. The rename is atomic, so a
 concurrent reader either sees the previous complete entry or the new complete
 one — never a half-written file.
 
-A cache entry that is missing or unparseable is treated as a miss and refetched.
-(`RepeaterBookCacheError` exists in the hierarchy for cache failures but is not
-currently raised.)
+Reads and writes fail differently, deliberately. A cache entry that is missing
+or unparseable is treated as a miss and refetched — a stale or corrupt entry is
+recoverable, and failing the call over one would be worse than refetching. A
+failed *write* is raised as `RepeaterBookCacheError`: silently returning data
+the caller believes was cached would mean refetching on every subsequent call,
+against an API this library is obliged not to hammer.
+
+The temp file is cleaned up on any failure, so a failed write cannot leave an
+orphaned `.tmp` behind. `aiohttp.ClientOSError` is explicitly *not* wrapped —
+it subclasses `OSError`, but a connection dropped mid-stream is a transport
+failure that happens to occur while the cache file is open.
 
 #### Row-level resilience
 
@@ -287,7 +295,7 @@ RepeaterBookError
 │   └── RepeaterBookRateLimitError      429 — carries retry_after
 ├── RepeaterBookValidationError     malformed response or data
 │   └── RepeaterBookRowError            one export row; carries the raw row and a label
-└── RepeaterBookCacheError         reserved for cache failures; not currently raised
+└── RepeaterBookCacheError         the response could not be cached (write failure)
 ```
 
 Because the HTTP-status errors are subclasses of `RepeaterBookAPIError`, order
