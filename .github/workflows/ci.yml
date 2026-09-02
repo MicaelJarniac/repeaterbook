@@ -7,6 +7,9 @@ on:
       - main
       - rc
 
+permissions:
+  contents: read
+
 env:
   FORCE_COLOR: 1
   PRE_COMMIT_COLOR: "always"  # https://github.com/pre-commit/pre-commit/issues/2918
