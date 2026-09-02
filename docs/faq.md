@@ -345,6 +345,18 @@ Or start fresh:
 rm repeaterbook.db
 ```
 
+### My database is suddenly empty after upgrading
+
+That is deliberate. The database is a cache of re-downloadable data, so rather
+than migrate it across a schema change, the library discards it and starts
+clean — you will see a `Discarding cached database` warning explaining why.
+Call `populate()` again to refill it.
+
+Each file stores a fingerprint of the schema that wrote it, derived from the
+models themselves. If that no longer matches the running version, the file
+cannot be read back correctly (an old text column read as a boolean, say, is
+worse than no data at all), so it goes.
+
 ## API Questions
 
 ### Why am I getting 401 or 403 from the API?

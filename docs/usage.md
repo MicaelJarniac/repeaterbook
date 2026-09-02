@@ -219,6 +219,17 @@ rb = RepeaterBook(database="my_repeaters.db")
 rb = RepeaterBook(working_dir=Path("/tmp"), database="repeaters.db")
 ```
 
+!!! warning "The database is a cache, not storage"
+    Everything in it can be re-downloaded from RepeaterBook, so the library
+    treats it as disposable. Each file records a fingerprint of the schema it
+    was written with, and when a library upgrade changes that schema the file
+    is **deleted and recreated empty**, with a warning logged — there is no
+    migration. Repopulate with `populate()` afterwards.
+
+    This is why a query can come back empty right after an upgrade. Do not
+    keep anything in this file that you are not willing to lose; write your
+    own data somewhere else.
+
 ### Populating the Database
 
 Use `populate()` to add repeaters to the database:

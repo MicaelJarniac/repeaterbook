@@ -193,7 +193,29 @@ which makes repeated imports of overlapping regions safe. Sessions are opened
 per call and not exposed as attributes — when you need a statement the wrapper
 cannot express, construct a `Session` against its `engine` yourself.
 
-Schema creation is explicit (`init_db()`), and `populate()` calls it for you.
+Building the engine creates the schema, so `init_db()` is available but rarely
+needed.
+
+#### The database is a cache, so schema drift wipes it
+
+There is no migration machinery, and deliberately so: the file holds nothing
+that cannot be re-fetched from RepeaterBook. Instead, `schema_fingerprint()`
+digests the SQLModel metadata — column names, types, nullability, primary
+keys, indexes — and every database records the fingerprint it was created
+with. On open, a file whose fingerprint does not match is deleted and
+recreated empty.
+
+The fingerprint is derived rather than hand-maintained because the failure
+mode of forgetting to bump a manual version is silent. SQLite is dynamically
+typed and will happily hand back an old `VARCHAR` value through a new
+`Boolean` column: `'Yes'` and `'No'` both arrive as `True`. Wrong data that
+looks right is worse than an empty cache, and it is what an unnoticed schema
+change would produce.
+
+The trade is that the digest is over-sensitive — an index-only change also
+triggers a wipe, costing a re-download nothing strictly required. That is the
+right direction to err. A file with no marker at all (written before this
+mechanism), or one that will not open, is treated the same way.
 
 !!! warning "One handle per database file"
     SQLite locking makes concurrent `RepeaterBook` instances against the same
