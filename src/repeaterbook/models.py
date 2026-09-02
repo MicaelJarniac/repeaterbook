@@ -25,6 +25,7 @@ __all__: tuple[str, ...] = (
     "UseJSON",
     "YesNoJSON",
     "ZeroOneJSON",
+    "parse_yes_no",
 )
 
 from datetime import date
@@ -93,6 +94,27 @@ class ServiceType(Enum):
     GMRS = auto()
 
 
+def parse_yes_no(raw: object) -> bool | None:
+    """Decode RepeaterBook's `"Yes"`/`"No"` vocabulary into a tri-state boolean.
+
+    The emergency-service fields are genuinely three-valued, which is why this
+    returns `None` rather than defaulting to `False` the way `services.b()`
+    does for the capability flags:
+
+    - `"Yes"` -> `True`, the service is supported.
+    - `"No"` -> `False`, the service is explicitly *not* supported.
+    - missing, empty, or unrecognized -> `None`, **unknown**.
+
+    The third state is not hypothetical: `exportROW.php` omits these keys
+    entirely, so every rest-of-world repeater is unknown rather than
+    unsupported. Collapsing unknown into `False` would assert something the
+    export never said.
+    """
+    if isinstance(raw, str):
+        return {"Yes": True, "No": False}.get(raw.strip())
+    return None
+
+
 class Repeater(SQLModel, table=True):
     """Repeater."""
 
@@ -114,10 +136,13 @@ class Repeater(SQLModel, table=True):
     callsign: str | None
     use_membership: Use = Field(index=True)
     operational_status: Status = Field(index=True)
-    ares: str | None
-    races: str | None
-    skywarn: str | None
-    canwarn: str | None
+    # Tri-state on purpose: True/False/None is "supported"/"not supported"/
+    # "unknown". `exportROW.php` omits these four keys entirely, so a non-NA
+    # repeater is unknown, not unsupported. See `parse_yes_no`.
+    ares: bool | None = Field(default=None, index=True)
+    races: bool | None = Field(default=None, index=True)
+    skywarn: bool | None = Field(default=None, index=True)
+    canwarn: bool | None = Field(default=None, index=True)
     allstar_node: str | None
     echolink_node: str | None
     irlp_node: str | None
@@ -237,6 +262,27 @@ class Repeater(SQLModel, table=True):
         )
         return frozenset(mode for capable, mode in pairs if capable)
 
+    @property
+    def emergency_services(self) -> frozenset[Emergency]:
+        """The emergency services this repeater is *known* to support.
+
+        Mirrors `modes`, and uses the same `Emergency` enum that
+        `ExportQuery.emergency_services` uses to *ask* for these repeaters, so
+        the query and result sides speak one vocabulary.
+
+        Only `True` counts. An unknown service (`None`, i.e. a rest-of-world
+        export that never reported it) is omitted just like an unsupported
+        one, so an empty set means "none known", not "none supported". Read
+        the individual fields when that difference matters.
+        """
+        pairs = (
+            (self.ares, Emergency.ARES),
+            (self.races, Emergency.RACES),
+            (self.skywarn, Emergency.SKYWARN),
+            (self.canwarn, Emergency.CANWARN),
+        )
+        return frozenset(service for supported, service in pairs if supported)
+
 
 # JSON models
 
@@ -296,10 +342,12 @@ RepeaterJSON = TypedDict(
         "State": str,
         "Country": str,
         "County": str,
-        "ARES": str,
-        "RACES": str,
-        "SKYWARN": str,
-        "CANWARN": str,
+        # Yes/No like the capability flags below, and NA-only: `exportROW.php`
+        # omits these four keys, which `total=False` already permits.
+        "ARES": YesNoJSON,
+        "RACES": YesNoJSON,
+        "SKYWARN": YesNoJSON,
+        "CANWARN": YesNoJSON,
         "Lat": str,
         "Long": str,
         "Precise": ZeroOneJSON,

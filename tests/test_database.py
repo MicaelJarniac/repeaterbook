@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 from loguru import logger
 from sqlalchemy import String
+from sqlmodel import col
 
 from repeaterbook.database import RepeaterBook, schema_fingerprint
 from repeaterbook.models import Repeater, Status, Use
@@ -42,8 +43,8 @@ def sample_repeater() -> Repeater:
         callsign="W6ABC",
         use_membership=Use.OPEN,
         operational_status=Status.ON_AIR,
-        ares=None,
-        races=None,
+        ares=True,
+        races=False,
         skywarn=None,
         canwarn=None,
         allstar_node=None,
@@ -255,6 +256,40 @@ class TestRepeaterBookDatabase:
         results = rb.query()
         assert len(results) == 0
 
+    def test_emergency_fields_round_trip(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """All three emergency states survive a write and read back."""
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+        rb.populate([sample_repeater])
+
+        (result,) = rb.query()
+        assert result.ares is True
+        assert result.races is False
+        assert result.skywarn is None
+
+    def test_emergency_fields_are_queryable_by_bool(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """`== True` and `== False` select in SQL and do not collide.
+
+        The bug this replaces: as strings, `== True` matched nothing while a
+        null check matched everything, including explicit `"No"` rows.
+        """
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+        rb.populate([sample_repeater])
+
+        assert len(rb.query(Repeater.ares == True)) == 1  # noqa: E712
+        assert len(rb.query(Repeater.ares == False)) == 0  # noqa: E712
+        assert len(rb.query(Repeater.races == False)) == 1  # noqa: E712
+        assert len(rb.query(Repeater.races == True)) == 0  # noqa: E712
+        # Unknown is null, so it is excluded from both.
+        assert len(rb.query(Repeater.skywarn == True)) == 0  # noqa: E712
+        assert len(rb.query(Repeater.skywarn == False)) == 0  # noqa: E712
+        # `col()` because the annotation is `bool | None`; the plain attribute
+        # types as the value, not the column, so `.is_()` is invisible to mypy.
+        assert len(rb.query(col(Repeater.skywarn).is_(None))) == 1
+
 
 def _read_marker(db: StdPath) -> list[tuple[str, str]]:
     """Return the rows of the schema-marker table, or [] if it is absent."""
@@ -345,7 +380,8 @@ class TestStaleDatabaseIsDiscarded:
         """A file predating this mechanism has no marker, so it goes.
 
         This is the upgrade path for anyone holding a database written by an
-        earlier release.
+        earlier release, including one with the four emergency columns still
+        typed as strings.
         """
         db = tmp_path / "repeaterbook.db"
         connection = sqlite3.connect(db)

@@ -122,6 +122,52 @@ async def test_live_export_row_parses(live_api: RepeaterBookAPI) -> None:
 
 @pytest.mark.integration
 @pytest.mark.anyio
+async def test_live_emergency_fields_are_strictly_yes_or_no(
+    live_api: RepeaterBookAPI,
+) -> None:
+    """Pins the wire vocabulary the tri-state decoding depends on.
+
+    The offline suite asserts that `"Yes"`/`"No"` decode to True/False, but it
+    cannot notice the API growing a third spelling. This can: if RepeaterBook
+    ever sends a free-form value, every row carrying it decodes to None and
+    this fails, rather than the value silently vanishing.
+    """
+    url = URL("https://repeaterbook.com/api/export.php") % {
+        "state_id": _SMALL_NA_STATE_ID,
+        "country": "United States",
+    }
+    payload = await live_api.export_json(url)
+    rows = payload["results"][:_NA_SAMPLE_SIZE]
+    assert rows, "expected a non-empty North America export"
+
+    for key in ("ARES", "RACES", "SKYWARN", "CANWARN"):
+        values = {row.get(key) for row in rows}  # type: ignore[misc]
+        assert values <= {"Yes", "No"}, f"unexpected {key} values: {values}"
+
+
+@pytest.mark.integration
+@pytest.mark.anyio
+async def test_live_row_export_omits_emergency_fields(
+    live_api: RepeaterBookAPI,
+) -> None:
+    """Pins the third state: rest-of-world never reports these at all.
+
+    This is what makes `None` mean "unknown" rather than "not supported". If
+    the ROW endpoint ever starts sending them, the distinction stops being
+    load-bearing and this fails to say so.
+    """
+    country = pycountry.countries.lookup(_SMALL_ROW_COUNTRY)
+    (url,) = live_api.urls_export(ExportQuery(countries=frozenset({country})))
+    payload = await live_api.export_json(url)
+    rows = payload["results"]
+    assert rows, "expected a non-empty rest-of-world export"
+
+    for key in ("ARES", "RACES", "SKYWARN", "CANWARN"):
+        assert all(key not in row for row in rows), f"ROW export now sends {key}"
+
+
+@pytest.mark.integration
+@pytest.mark.anyio
 async def test_live_auth_accepts_different_app_version(
     live_token: str,
     tmp_path: StdPath,

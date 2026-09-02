@@ -57,6 +57,7 @@ from repeaterbook.models import (
     ServiceTypeJSON,
     Status,
     Use,
+    parse_yes_no,
 )
 
 if TYPE_CHECKING:
@@ -370,10 +371,11 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
             callsign=s("Callsign") or None,
             use_membership=USE_MAP.get(s("Use"), Use.OPEN),
             operational_status=STATUS_MAP.get(s("Operational Status"), Status.UNKNOWN),
-            ares=s("ARES") or None,
-            races=s("RACES") or None,
-            skywarn=s("SKYWARN") or None,
-            canwarn=s("CANWARN") or None,
+            # Tri-state, not `b()`: absent means unknown here, not False.
+            ares=parse_yes_no(j.get("ARES")),
+            races=parse_yes_no(j.get("RACES")),
+            skywarn=parse_yes_no(j.get("SKYWARN")),
+            canwarn=parse_yes_no(j.get("CANWARN")),
             allstar_node=s("AllStar Node") or None,
             echolink_node=s("EchoLink Node") or None,
             irlp_node=s("IRLP Node") or None,

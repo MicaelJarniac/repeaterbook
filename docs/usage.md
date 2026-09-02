@@ -521,35 +521,54 @@ unknown = rb.query(Repeater.operational_status == Status.UNKNOWN)
 
 ### Emergency Services
 
-These four columns are strings, and the North America export sets them to
-`"Yes"` **or `"No"`** — not to null when a service is unsupported. So a null
-check matches every row, and `== True` matches none: compare to `"Yes"`.
+These four columns are **tri-state booleans** — `True`, `False`, or `None`:
+
+| value | meaning |
+|---|---|
+| `True` | the repeater supports the service |
+| `False` | it explicitly does *not* (North America exports say so) |
+| `None` | **unknown** — the export never reported it |
 
 ```python
 # Repeaters with ARES support
-ares = rb.query(Repeater.ares == "Yes")
+ares = rb.query(Repeater.ares == True)
 
 # Repeaters with RACES support
-races = rb.query(Repeater.races == "Yes")
+races = rb.query(Repeater.races == True)
 
 # Repeaters with SKYWARN support
-skywarn = rb.query(Repeater.skywarn == "Yes")
+skywarn = rb.query(Repeater.skywarn == True)
 
 # Repeaters with CANWARN support
-canwarn = rb.query(Repeater.canwarn == "Yes")
+canwarn = rb.query(Repeater.canwarn == True)
 
 # Any emergency services
 emergency = rb.query(
-    (Repeater.ares == "Yes") |
-    (Repeater.races == "Yes") |
-    (Repeater.skywarn == "Yes") |
-    (Repeater.canwarn == "Yes")
+    (Repeater.ares == True)
+    | (Repeater.races == True)
+    | (Repeater.skywarn == True)
+    | (Repeater.canwarn == True)
 )
 ```
 
+On a repeater you already hold, `emergency_services` gives the same answer as
+a set, using the same `Emergency` enum you would pass to an `ExportQuery`:
+
+```python
+from repeaterbook.models import Emergency
+
+if Emergency.ARES in repeater.emergency_services:
+    ...
+```
+
+!!! warning "Do not use a null check to mean "supported""
+    `None` is a third state, not a synonym for `False`, so
+    `Repeater.ares.is_not(None)` matches explicitly *unsupported* repeaters
+    too. Compare against `True`.
+
 !!! note "Rest-of-world exports omit these fields"
     `exportROW.php` does not send `ARES`/`RACES`/`SKYWARN`/`CANWARN` at all, so
-    for non-NA repeaters they are `None` rather than `"No"`. Treat `None` as
+    for non-NA repeaters they are `None` rather than `False`. Treat `None` as
     "unknown", not as "unsupported".
 
 ## Combining Queries
@@ -692,13 +711,13 @@ rep.pl_ctcss_tsq_downlink  # Output CTCSS/TSQ tone
 rep.operational_status  # ON_AIR, OFF_AIR, UNKNOWN
 rep.use_membership      # OPEN, PRIVATE, CLOSED
 
-# Emergency Services (string fields)
-# Emergency services. Strings: "Yes"/"No" on North America exports, and
-# None on rest-of-world exports, which omit these fields entirely.
-rep.ares            # ARES support indicator
-rep.races           # RACES support indicator
-rep.skywarn         # SKYWARN support indicator
-rep.canwarn         # CANWARN support indicator
+# Emergency services. Tri-state: True (supported), False (explicitly not),
+# or None (unknown -- rest-of-world exports omit these fields entirely).
+rep.ares            # ARES support
+rep.races           # RACES support
+rep.skywarn         # SKYWARN support
+rep.canwarn         # CANWARN support
+rep.emergency_services  # frozenset[Emergency] of the supported ones
 
 # Capabilities
 rep.analog_capable       # Boolean
