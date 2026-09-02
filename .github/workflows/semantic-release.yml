@@ -52,12 +52,35 @@ jobs:
 
       # Same reason as the release step above: publish-action is also a
       # Docker action and resolves the broken GitPython at build time.
+      #
+      # continue-on-error because this only attaches build artifacts to the
+      # GitHub release, which is a convenience: the tag, the release notes and
+      # the PyPI upload are what actually constitute a release. Letting it fail
+      # the job aborts the PyPI and MCP Registry steps below, which is how
+      # v0.11.0 ended up tagged on GitHub but absent from PyPI -- GitHub had
+      # turned on immutable releases, and assets cannot be added to a release
+      # after it is created. A failure here is reported by the follow-up step
+      # rather than silently swallowed.
       - name: Publish package to GitHub
+        id: publish_github
         if: steps.release.outputs.released == 'true'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run --no-sync semantic-release publish --tag "${{ steps.release.outputs.tag }}"
+
+      - name: Warn if release assets were not attached
+        if: >-
+          steps.release.outputs.released == 'true'
+          && steps.publish_github.outcome == 'failure'
+        run: |
+          echo "::warning title=Release assets not attached::Could not upload \
+          build artifacts to the ${{ steps.release.outputs.tag }} GitHub \
+          release. The tag and the PyPI upload are unaffected. If the repo has \
+          immutable releases enabled, assets must be attached when the release \
+          is created; consider setting upload_to_vcs_release = false in \
+          pyproject.toml."
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
