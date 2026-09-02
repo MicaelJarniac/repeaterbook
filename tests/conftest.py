@@ -96,8 +96,12 @@ def sample_repeater() -> SampleRepeaterFactory:
             "callsign": "VK4RBN",
             "use_membership": Use.OPEN,
             "operational_status": Status.ON_AIR,
-            "ares": None,
-            "races": None,
+            # All three emergency states are represented on purpose: supported,
+            # explicitly unsupported, and unknown. A fixture that was uniformly
+            # None let the "Yes"/"No"/absent distinction go untested, which is
+            # how the string-typed columns stayed wrong for so long.
+            "ares": True,
+            "races": False,
             "skywarn": None,
             "canwarn": None,
             "allstar_node": None,

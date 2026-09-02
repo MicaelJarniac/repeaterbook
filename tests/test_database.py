@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
+from loguru import logger
+from sqlalchemy import String
+from sqlmodel import col
 
-from repeaterbook.database import RepeaterBook
+from repeaterbook.database import RepeaterBook, schema_fingerprint
 from repeaterbook.models import Repeater, Status, Use
 
 if TYPE_CHECKING:
@@ -39,8 +43,8 @@ def sample_repeater() -> Repeater:
         callsign="W6ABC",
         use_membership=Use.OPEN,
         operational_status=Status.ON_AIR,
-        ares=None,
-        races=None,
+        ares=True,
+        races=False,
         skywarn=None,
         canwarn=None,
         allstar_node=None,
@@ -251,3 +255,205 @@ class TestRepeaterBookDatabase:
         rb.init_db()
         results = rb.query()
         assert len(results) == 0
+
+    def test_emergency_fields_round_trip(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """All three emergency states survive a write and read back."""
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+        rb.populate([sample_repeater])
+
+        (result,) = rb.query()
+        assert result.ares is True
+        assert result.races is False
+        assert result.skywarn is None
+
+    def test_emergency_fields_are_queryable_by_bool(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """`== True` and `== False` select in SQL and do not collide.
+
+        The bug this replaces: as strings, `== True` matched nothing while a
+        null check matched everything, including explicit `"No"` rows.
+        """
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+        rb.populate([sample_repeater])
+
+        assert len(rb.query(Repeater.ares == True)) == 1  # noqa: E712
+        assert len(rb.query(Repeater.ares == False)) == 0  # noqa: E712
+        assert len(rb.query(Repeater.races == False)) == 1  # noqa: E712
+        assert len(rb.query(Repeater.races == True)) == 0  # noqa: E712
+        # Unknown is null, so it is excluded from both.
+        assert len(rb.query(Repeater.skywarn == True)) == 0  # noqa: E712
+        assert len(rb.query(Repeater.skywarn == False)) == 0  # noqa: E712
+        # `col()` because the annotation is `bool | None`; the plain attribute
+        # types as the value, not the column, so `.is_()` is invisible to mypy.
+        assert len(rb.query(col(Repeater.skywarn).is_(None))) == 1
+
+
+def _read_marker(db: StdPath) -> list[tuple[str, str]]:
+    """Return the rows of the schema-marker table, or [] if it is absent."""
+    connection = sqlite3.connect(db)
+    try:
+        return connection.execute(
+            "SELECT key, fingerprint FROM repeaterbook_schema_version"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    finally:
+        connection.close()
+
+
+class TestSchemaFingerprint:
+    """Tests for the derived schema fingerprint."""
+
+    def test_is_stable_across_calls(self) -> None:
+        """The same schema hashes to the same digest every time."""
+        assert schema_fingerprint() == schema_fingerprint()
+
+    def test_tracks_column_type(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Retyping a column moves the digest.
+
+        The property the whole mechanism rests on. Retyping is the change that
+        a stale file survives most dangerously: SQLite is dynamically typed
+        and will hand an old `VARCHAR` value back through a new `Boolean`
+        column, where any non-empty string arrives as True.
+        """
+        before = schema_fingerprint()
+        table = Repeater.__table__  # type: ignore[attr-defined]
+        monkeypatch.setattr(table.c.precise, "type", String())
+
+        assert schema_fingerprint() != before
+
+    def test_tracks_nullability(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Making a column non-nullable moves the digest."""
+        before = schema_fingerprint()
+        table = Repeater.__table__  # type: ignore[attr-defined]
+        monkeypatch.setattr(table.c.notes, "nullable", False)
+
+        assert schema_fingerprint() != before
+
+
+class TestStaleDatabaseIsDiscarded:
+    """Tests for wipe-on-schema-drift.
+
+    The database is a cache of re-downloadable data, so the library discards a
+    file it cannot trust rather than migrating it.
+    """
+
+    def test_fresh_database_is_stamped(self, tmp_path: StdPath) -> None:
+        """A newly created database records the schema it was built with."""
+        RepeaterBook(working_dir=Path(tmp_path)).init_db()
+
+        assert _read_marker(tmp_path / "repeaterbook.db") == [
+            ("repeaterbook_schema", schema_fingerprint())
+        ]
+
+    def test_current_database_is_kept(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """A file matching the current schema survives, data intact."""
+        RepeaterBook(working_dir=Path(tmp_path)).populate([sample_repeater])
+
+        # A second instance re-runs the staleness check from scratch.
+        assert len(RepeaterBook(working_dir=Path(tmp_path)).query()) == 1
+
+    def test_stale_database_is_discarded(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """A file stamped with a different schema is wiped, not migrated."""
+        db = tmp_path / "repeaterbook.db"
+        RepeaterBook(working_dir=Path(tmp_path)).populate([sample_repeater])
+
+        connection = sqlite3.connect(db)
+        with connection:
+            connection.execute(
+                "UPDATE repeaterbook_schema_version SET fingerprint = 'stale'"
+            )
+        connection.close()
+
+        assert RepeaterBook(working_dir=Path(tmp_path)).query() == []
+        # Rebuilt and re-stamped, rather than merely deleted.
+        assert _read_marker(db) == [("repeaterbook_schema", schema_fingerprint())]
+
+    def test_unmarked_database_is_discarded(self, tmp_path: StdPath) -> None:
+        """A file predating this mechanism has no marker, so it goes.
+
+        This is the upgrade path for anyone holding a database written by an
+        earlier release, including one with the four emergency columns still
+        typed as strings.
+        """
+        db = tmp_path / "repeaterbook.db"
+        connection = sqlite3.connect(db)
+        with connection:
+            connection.execute("CREATE TABLE repeater (state_id TEXT, ares TEXT)")
+            connection.execute("INSERT INTO repeater VALUES ('CA', 'Yes')")
+        connection.close()
+
+        assert RepeaterBook(working_dir=Path(tmp_path)).query() == []
+        assert _read_marker(db) == [("repeaterbook_schema", schema_fingerprint())]
+
+    def test_corrupt_file_is_discarded(self, tmp_path: StdPath) -> None:
+        """A file that is not a database at all is replaced, not raised over."""
+        db = tmp_path / "repeaterbook.db"
+        db.write_bytes(b"this is not a sqlite database")
+
+        assert RepeaterBook(working_dir=Path(tmp_path)).query() == []
+        assert _read_marker(db) == [("repeaterbook_schema", schema_fingerprint())]
+
+    def test_missing_database_is_queryable(self, tmp_path: StdPath) -> None:
+        """A never-populated working directory reads as empty, not an error."""
+        assert RepeaterBook(working_dir=Path(tmp_path)).query() == []
+
+    def test_discard_warns(
+        self, tmp_path: StdPath, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Losing cached data is visible, not silent."""
+        db = tmp_path / "repeaterbook.db"
+        connection = sqlite3.connect(db)
+        with connection:
+            connection.execute("CREATE TABLE repeater (state_id TEXT)")
+        connection.close()
+
+        # loguru does not feed pytest's caplog handler by default.
+        handler_id = logger.add(caplog.handler, level="WARNING", format="{message}")
+        try:
+            RepeaterBook(working_dir=Path(tmp_path)).query()
+        finally:
+            logger.remove(handler_id)
+
+        assert "Discarding cached database" in caplog.text
+        assert "missing its schema marker" in caplog.text
+
+    def test_keeping_a_current_database_does_not_warn(
+        self, tmp_path: StdPath, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The happy path stays quiet."""
+        RepeaterBook(working_dir=Path(tmp_path)).init_db()
+
+        handler_id = logger.add(caplog.handler, level="WARNING", format="{message}")
+        try:
+            RepeaterBook(working_dir=Path(tmp_path)).query()
+        finally:
+            logger.remove(handler_id)
+
+        assert "Discarding" not in caplog.text
+
+    def test_truncate_empties_rows_but_keeps_the_marker(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """Clearing the data must not make the file look stale.
+
+        `truncate` drops repeaters, not the schema, so the marker has to
+        survive -- otherwise the next open would "discard" a database that is
+        perfectly current.
+        """
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+        rb.populate([sample_repeater])
+
+        rb.truncate()
+
+        assert rb.query() == []
+        assert _read_marker(tmp_path / "repeaterbook.db") == [
+            ("repeaterbook_schema", schema_fingerprint())
+        ]

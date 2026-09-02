@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 
 from repeaterbook.exceptions import RepeaterBookRowError
+from repeaterbook.models import Emergency
 from repeaterbook.services import json_to_model, json_to_models
 
 
@@ -86,10 +87,10 @@ def test_json_to_model_accepts_north_america_payload_without_region() -> None:
         "Callsign": "W6TEST",
         "Use": "OPEN",
         "Operational Status": "On-air",
-        "ARES": "",
-        "RACES": "",
-        "SKYWARN": "",
-        "CANWARN": "",
+        "ARES": "No",
+        "RACES": "No",
+        "SKYWARN": "No",
+        "CANWARN": "No",
         "AllStar Node": "0",
         "EchoLink Node": "0",
         "IRLP Node": "",
@@ -116,6 +117,101 @@ def test_json_to_model_accepts_north_america_payload_without_region() -> None:
     rep = json_to_model(payload)  # type: ignore[arg-type]
     assert rep.region is None
     assert rep.county == "SomeCounty"
+
+
+# Verbatim from a live export.php pull of state_id=44 (Rhode Island), the query
+# that settled how these fields are actually spelled: every NA row carries all
+# four keys, and every value is the literal "Yes" or "No" -- never blank, never
+# free-form. Kept as the seed so a format change is visible here.
+_RHODE_ISLAND_ROW = {
+    "State ID": "44",
+    "Rptr ID": 3456,
+    "Frequency": "147.04500",
+    "Input Freq": "147.64500",
+    "PL": "",
+    "TSQ": "CSQ",
+    "Nearest City": "West Warwick",
+    "Landmark": "",
+    "County": "Kent",
+    "State": "Rhode Island",
+    "Country": "United States",
+    "Lat": "41.62850189",
+    "Long": "-71.66380310",
+    "Precise": 0,
+    "Callsign": "W1HDN",
+    "Use": "OPEN",
+    "Operational Status": "Off-air",
+    "ARES": "Yes",
+    "RACES": "No",
+    "SKYWARN": "Yes",
+    "CANWARN": "No",
+    "AllStar Node": "0",
+    "EchoLink Node": "0",
+    "IRLP Node": "0",
+    "Wires Node": "",
+    "FM Analog": "No",
+    "FM Bandwidth": "25.0 kHz",
+    "DMR": "No",
+    "DMR Color Code": "",
+    "DMR ID": "",
+    "D-Star": "Yes",
+    "D-Star Service": "DV",
+    "NXDN": "No",
+    "APCO P-25": "No",
+    "P-25 NAC": "",
+    "M17": "No",
+    "M17 CAN": "",
+    "Tetra": "No",
+    "Tetra MCC": "",
+    "Tetra MNC": "",
+    "System Fusion": "No",
+    "Notes": "",
+    "Last Update": "2025-01-25",
+}
+
+
+def test_north_america_emergency_fields_decode_to_booleans() -> None:
+    """`"Yes"`/`"No"` become True/False, not truthy strings.
+
+    Both halves matter. `"No"` decoding to False is the sharper one: as a
+    string it was non-null *and* truthy, so a null check matched it and
+    reported an explicitly unsupported repeater as supported.
+    """
+    rep = json_to_model(_RHODE_ISLAND_ROW)  # type: ignore[arg-type]
+
+    assert rep.ares is True
+    assert rep.races is False
+    assert rep.skywarn is True
+    assert rep.canwarn is False
+
+
+def test_north_america_emergency_services_set() -> None:
+    """The derived set names exactly the supported services."""
+    rep = json_to_model(_RHODE_ISLAND_ROW)  # type: ignore[arg-type]
+
+    assert rep.emergency_services == frozenset({Emergency.ARES, Emergency.SKYWARN})
+
+
+def test_rest_of_world_emergency_fields_are_unknown_not_false() -> None:
+    """`exportROW.php` omits these keys, so a ROW repeater is unknown.
+
+    Verified against a live Luxembourg export: 0 of 23 rows carried any of the
+    four keys. Defaulting them to False would claim the export said "not
+    supported" when it said nothing at all.
+    """
+    row_payload = {
+        key: value
+        for key, value in _RHODE_ISLAND_ROW.items()
+        if key not in {"ARES", "RACES", "SKYWARN", "CANWARN"}
+    }
+
+    rep = json_to_model(row_payload)  # type: ignore[arg-type]
+
+    assert rep.ares is None
+    assert rep.races is None
+    assert rep.skywarn is None
+    assert rep.canwarn is None
+    assert rep.emergency_services == frozenset()
 
 
 # The real Texas row that made state_id="48" undownloadable: a 1.2 GHz repeater

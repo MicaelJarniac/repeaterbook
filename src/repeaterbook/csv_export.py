@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Final, cast
 
-from repeaterbook.models import Repeater, RepeaterCSV, Status, Use
+from repeaterbook.models import Repeater, RepeaterCSV, Status, Use, parse_yes_no
 
 if TYPE_CHECKING:
     import io
@@ -43,10 +43,12 @@ def csv_row_to_model(c: RepeaterCSV, /) -> Repeater:
             landmark=c["Landmark"] or None,
             latitude=d(c["Latitude"]),
             longitude=d(c["Longitude"]),
-            ares=c["ARES"] or None,
-            races=c["RACES"] or None,
-            skywarn=c["SKYWARN"] or None,
-            canwarn=c["CANWARN"] or None,
+            # Tri-state: the CSV leaves these blank outside North America, and
+            # blank is "unknown", not "not supported".
+            ares=parse_yes_no(c["ARES"]),
+            races=parse_yes_no(c["RACES"]),
+            skywarn=parse_yes_no(c["SKYWARN"]),
+            canwarn=parse_yes_no(c["CANWARN"]),
             allstar_node=c["AllStar Node"] or None,
             echolink_node=c["EchoLink Node"] or None,
             irlp_node=c["IRLP Node"] or None,

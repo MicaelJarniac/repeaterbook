@@ -20,6 +20,7 @@ from repeaterbook.models import (
     ServiceType,
     Status,
     Use,
+    parse_yes_no,
 )
 from repeaterbook.spec import DmrParams, FmParams, RepeaterMode
 
@@ -107,8 +108,8 @@ class TestRepeaterModel:
             callsign="W6ABC",
             use_membership=Use.OPEN,
             operational_status=Status.ON_AIR,
-            ares=None,
-            races=None,
+            ares=True,
+            races=False,
             skywarn=None,
             canwarn=None,
             allstar_node=None,
@@ -163,7 +164,19 @@ class TestRepeaterModel:
     def test_repeater_optional_fields(self, sample_repeater: Repeater) -> None:
         """Optional fields should allow None."""
         assert sample_repeater.region is None
-        assert sample_repeater.ares is None
+        assert sample_repeater.skywarn is None
+
+    def test_emergency_fields_are_tri_state(self, sample_repeater: Repeater) -> None:
+        """Emergency fields distinguish supported, unsupported, and unknown."""
+        assert sample_repeater.ares is True
+        assert sample_repeater.races is False
+        assert sample_repeater.skywarn is None
+
+    def test_emergency_services_collects_only_supported(
+        self, sample_repeater: Repeater
+    ) -> None:
+        """Only True lands in the set; False and None are both left out."""
+        assert sample_repeater.emergency_services == frozenset({Emergency.ARES})
 
 
 class TestRepeaterValidation:
@@ -371,6 +384,51 @@ def test_accessors_do_not_change_persistence_surface(
     assert "dmr" not in columns
     assert "fm" not in columns
     assert "modes" not in columns
+    assert "emergency_services" not in columns
     assert "dmr" not in Repeater.model_fields
+    assert "emergency_services" not in Repeater.model_fields
     rep = sample_repeater(dmr_capable=True, dmr_id="5051")
     assert "dmr" not in rep.model_dump()
+    assert "emergency_services" not in rep.model_dump()
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Yes", True),
+        ("No", False),
+        # Whitespace shows up in community-maintained data.
+        (" Yes ", True),
+        # Absent, blank, and unrecognized are all "unknown" rather than False:
+        # the export declining to say is not the export saying no.
+        ("", None),
+        (None, None),
+        ("Maybe", None),
+        # Case-sensitive on purpose: RepeaterBook only ever sends "Yes"/"No",
+        # so anything else is unrecognized rather than quietly reinterpreted.
+        ("yes", None),
+        # Non-strings cannot be a Yes/No answer. Notably 1/0, which the
+        # capability flags do use -- these four fields never do.
+        (1, None),
+        (0, None),
+    ],
+)
+def test_parse_yes_no(raw: object, expected: bool | None) -> None:  # noqa: FBT001
+    """parse_yes_no maps the wire vocabulary to a tri-state boolean."""
+    assert parse_yes_no(raw) is expected
+
+
+def test_emergency_services_empty_when_all_unknown(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """A rest-of-world repeater reports no known services, not False ones."""
+    rep = sample_repeater(ares=None, races=None, skywarn=None, canwarn=None)
+    assert rep.emergency_services == frozenset()
+
+
+def test_emergency_services_covers_every_enum_member(
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """Every Emergency member is reachable, so a new one cannot be forgotten."""
+    rep = sample_repeater(ares=True, races=True, skywarn=True, canwarn=True)
+    assert rep.emergency_services == frozenset(Emergency)
