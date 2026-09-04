@@ -197,6 +197,17 @@ build_command = """
   uv build
 """
 
+[tool.semantic_release.changelog]
+# PSR v10 changed this default from "init" (rewrite the whole file every
+# release) to "update" (splice the new version in at `insertion_flag`). In
+# update mode a changelog without the flag is written back byte-for-byte with
+# no warning, which is how v0.8.0-v0.11.1 went unrecorded (#74). Both values
+# are pinned so a future default change cannot silently do it again, and
+# docs/CHANGELOG.md must keep the flag right under its title; the test in
+# tests/test_changelog.py enforces that.
+mode = "update"
+insertion_flag = "<!-- version list -->"
+
 [tool.semantic_release.changelog.default_templates]
 changelog_file = "docs/CHANGELOG.md"
 
