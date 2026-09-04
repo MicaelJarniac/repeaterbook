@@ -22,9 +22,22 @@ from repeaterbook.models import (
     Use,
     parse_yes_no,
 )
-from repeaterbook.spec import DmrParams, FmParams, RepeaterMode
+from repeaterbook.spec import (
+    DmrParams,
+    DStarParams,
+    FmParams,
+    FusionParams,
+    M17Params,
+    NxdnParams,
+    P25Params,
+    RepeaterMode,
+    TetraParams,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from repeaterbook.spec import _ParamsUnion
     from tests._types import SampleRepeaterFactory
 
 
@@ -364,6 +377,76 @@ def test_repeater_fm_accessor_carries_bandwidth(
     """The fm accessor should carry the FM bandwidth."""
     rep = sample_repeater(analog_capable=True, fm_bandwidth=Decimal("12.5"))
     assert rep.fm == FmParams(bandwidth_khz=Decimal("12.5"))
+
+
+# One row per mode accessor: the capability flag that gates it, the accessor,
+# and the params it should produce when the flag is set (given the identifying
+# fields below). Kept as a table so every accessor gets *both* branches -- the
+# multi-line `if not capable: return None` bodies in `fusion` and `tetra` were
+# the last uncovered lines in `models.py`, and the one-line ternaries in
+# `dstar`/`p25`/`nxdn`/`m17` have no branch arc for coverage to even notice.
+_ACCESSOR_CASES: list[tuple[str, Callable[[Repeater], _ParamsUnion | None], object]] = [
+    ("analog_capable", lambda r: r.fm, FmParams(bandwidth_khz=Decimal("25.0"))),
+    ("dmr_capable", lambda r: r.dmr, DmrParams(dmr_id="5051", color_code="1")),
+    ("d_star_capable", lambda r: r.dstar, DStarParams()),
+    (
+        "yaesu_system_fusion_capable",
+        lambda r: r.fusion,
+        FusionParams(digital_id_uplink="1", digital_id_downlink="2", dsc="3"),
+    ),
+    ("apco_p_25_capable", lambda r: r.p25, P25Params(nac="293")),
+    ("nxdn_capable", lambda r: r.nxdn, NxdnParams()),
+    ("tetra_capable", lambda r: r.tetra, TetraParams(mcc="724", mnc="01")),
+    ("m17_capable", lambda r: r.m17, M17Params(can="7")),
+]
+
+# The mode-specific identifiers, set on every case so an accessor that leaks
+# them despite the flag being off is caught rather than hidden by their absence.
+_MODE_IDENTIFIERS: dict[str, object] = {
+    "fm_bandwidth": Decimal("25.0"),
+    "dmr_id": "5051",
+    "dmr_color_code": "1",
+    "ysf_digital_id_uplink": "1",
+    "ysf_digital_id_downlink": "2",
+    "ysf_dsc": "3",
+    "p_25_nac": "293",
+    "tetra_mcc": "724",
+    "tetra_mnc": "01",
+    "m17_can": "7",
+}
+
+
+@pytest.mark.parametrize(
+    ("flag", "accessor", "expected"),
+    _ACCESSOR_CASES,
+    ids=[flag for flag, _, _ in _ACCESSOR_CASES],
+)
+def test_mode_accessor_returns_none_when_incapable(
+    sample_repeater: SampleRepeaterFactory,
+    flag: str,
+    accessor: Callable[[Repeater], _ParamsUnion | None],
+    expected: object,
+) -> None:
+    """Each mode accessor is None when its flag is off, whatever else is set."""
+    del expected
+    rep = sample_repeater(**{**_MODE_IDENTIFIERS, flag: False})
+    assert accessor(rep) is None
+
+
+@pytest.mark.parametrize(
+    ("flag", "accessor", "expected"),
+    _ACCESSOR_CASES,
+    ids=[flag for flag, _, _ in _ACCESSOR_CASES],
+)
+def test_mode_accessor_carries_params_when_capable(
+    sample_repeater: SampleRepeaterFactory,
+    flag: str,
+    accessor: Callable[[Repeater], _ParamsUnion | None],
+    expected: object,
+) -> None:
+    """Each mode accessor carries its mode's identifiers when the flag is on."""
+    rep = sample_repeater(**{**_MODE_IDENTIFIERS, flag: True})
+    assert accessor(rep) == expected
 
 
 def test_repeater_modes_reflects_capabilities(

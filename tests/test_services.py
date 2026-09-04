@@ -21,8 +21,10 @@ from repeaterbook.exceptions import (
     RepeaterBookValidationError,
 )
 from repeaterbook.models import (
+    Emergency,
     ExportQuery,
     Mode,
+    ServiceType,
     Status,
     Use,
 )
@@ -489,6 +491,53 @@ class TestRepeaterBookAPIUrls:
         url_strs = [str(url) for url in urls]
         assert all("DMR" in url for url in url_strs)
 
+    # The `emcomm=` and `stype=` mapping lines sit inside a dict literal that is
+    # always built, so line coverage stayed green with empty lists. These pin
+    # the mapping itself. Parametrized over the enums, not a hand-written list,
+    # so a new member fails with a KeyError until it is mapped.
+    @pytest.mark.parametrize("emergency", list(Emergency))
+    def test_urls_export_emergency_service_routes_to_na_only(
+        self, emergency: Emergency
+    ) -> None:
+        """Each Emergency member maps to its wire name and is NA-only."""
+        api = RepeaterBookAPI()
+        query = ExportQuery(emergency_services=frozenset({emergency}))
+        urls = api.urls_export(query)
+        assert urls == {
+            URL("https://repeaterbook.com/api/export.php") % {"emcomm": emergency.name}
+        }
+
+    @pytest.mark.parametrize("service_type", list(ServiceType))
+    def test_urls_export_service_type_routes_to_na_only(
+        self, service_type: ServiceType
+    ) -> None:
+        """Each ServiceType member maps to its wire name and is NA-only."""
+        api = RepeaterBookAPI()
+        query = ExportQuery(service_types=frozenset({service_type}))
+        urls = api.urls_export(query)
+        assert urls == {
+            URL("https://repeaterbook.com/api/export.php")
+            % {"stype": service_type.name}
+        }
+
+    def test_urls_export_emergency_service_with_region_queries_both(self) -> None:
+        """An NA-only field alongside a ROW-only one hits both endpoints.
+
+        Neither side can be dropped: each endpoint only understands its own
+        field, so each URL carries just the parameter that endpoint accepts.
+        """
+        api = RepeaterBookAPI()
+        query = ExportQuery(
+            emergency_services=frozenset({Emergency.ARES}),
+            regions=frozenset({"South America"}),
+        )
+        urls = api.urls_export(query)
+        assert urls == {
+            URL("https://repeaterbook.com/api/export.php") % {"emcomm": "ARES"},
+            URL("https://repeaterbook.com/api/exportROW.php")
+            % {"region": "South America"},
+        }
+
     def test_custom_base_url(self) -> None:
         """Custom base_url should be used."""
         api = RepeaterBookAPI(base_url=URL("https://example.com"))
@@ -619,6 +668,36 @@ class TestRepeaterBookAPIExport:
             result = await api.export_json(url)
             assert result["count"] == 1
             assert len(result["results"]) == 1
+
+    @pytest.mark.anyio
+    async def test_export_json_warns_when_count_disagrees_with_results(
+        self,
+        tmp_path: StdPath,
+        local_server: Any,  # noqa: ANN401
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A `count` that does not match `results` is returned as-is, with a warning.
+
+        The count is the server's claim and the results are what it actually
+        sent. Trusting either silently would hide a truncated or padded
+        response; raising would throw away good rows over a bookkeeping field.
+        """
+
+        async def handler(_: web.Request) -> web.Response:
+            return web.json_response({"count": 2, "results": [{"test": "data"}]})
+
+        # loguru does not feed pytest's caplog handler by default.
+        handler_id = logger.add(caplog.handler, level="WARNING", format="{message}")
+        try:
+            async with local_server(handler) as url:
+                api = RepeaterBookAPI(working_dir=Path(tmp_path))
+                result = await api.export_json(url)
+        finally:
+            logger.remove(handler_id)
+
+        assert result["count"] == 2
+        assert len(result["results"]) == 1
+        assert "Mismatched count and length of results." in caplog.text
 
 
 class TestRepeaterBookAPIDownload:

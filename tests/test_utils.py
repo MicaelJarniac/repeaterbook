@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-from haversine import Unit  # type: ignore[import-untyped]
+import pytest
+from haversine import Unit, haversine  # type: ignore[import-untyped]
 
 from repeaterbook.utils import LatLon, Radius, SquareBounds, square_bounds
+
+
+def _contains(bounds: SquareBounds, point: LatLon) -> bool:
+    """Whether `point` falls inside `bounds`, the way `queries.square` tests it."""
+    return (
+        bounds.south <= point.lat <= bounds.north
+        and bounds.west <= point.lon <= bounds.east
+    )
 
 
 class TestLatLon:
@@ -79,28 +88,70 @@ class TestSquareBoundsFunction:
         assert abs(bounds.north - origin.lat) < 0.1
         assert abs(bounds.south - origin.lat) < 0.1
 
-    def test_large_radius_wraps_latitude(self) -> None:
-        """square_bounds should handle large radius that wraps around poles."""
-        origin = LatLon(lat=89.0, lon=0.0)  # Near north pole
-        radius = Radius(origin=origin, distance=500, unit=Unit.KILOMETERS)
+    def test_radius_past_the_antipode_opens_to_the_whole_globe(self) -> None:
+        """Beyond half the circumference every point is in range: bound nothing.
+
+        Past ~20,015 km the four great-circle destinations have all gone
+        through the antipode and come back, so "north" lands south of "south"
+        and "east" west of "west". A box drawn from those would be inside-out;
+        the function opens it to the full globe instead.
+        """
+        origin = LatLon(lat=0.0, lon=0.0)
+        radius = Radius(origin=origin, distance=25_000, unit=Unit.KILOMETERS)
+
         bounds = square_bounds(radius)
 
-        # When south goes past the pole, it should open up to full range
-        # (This is the wrap-around logic in the function)
-        if bounds.south > bounds.north:
-            assert bounds.north == 90.0
-            assert bounds.south == -90.0
+        assert bounds == SquareBounds(north=90.0, south=-90.0, east=180.0, west=-180.0)
 
-    def test_large_radius_wraps_longitude(self) -> None:
-        """square_bounds should handle large radius that wraps around meridian."""
-        origin = LatLon(lat=0.0, lon=179.0)  # Near date line
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "square_bounds only handles the past-the-antipode case. A radius that "
+            "crosses a pole produces a box that excludes the origin itself: the "
+            "great circle north from 89N comes back down the far side, so the "
+            "'north' bound lands *below* the origin. "
+            "https://github.com/MicaelJarniac/repeaterbook/issues/77"
+        ),
+    )
+    def test_radius_crossing_a_pole_keeps_nearby_points_inside(self) -> None:
+        """A bounding box must contain the origin and everything within the radius.
+
+        `queries.square` is a coarse pre-filter for `filter_radius`, so
+        over-approximating is fine and under-approximating loses repeaters.
+        """
+        origin = LatLon(lat=89.0, lon=0.0)
         radius = Radius(origin=origin, distance=500, unit=Unit.KILOMETERS)
+        # Just over the pole, on the far side. Well inside the radius.
+        across_the_pole = LatLon(lat=89.5, lon=180.0)
+        assert haversine(origin, across_the_pole, unit=Unit.KILOMETERS) < 500
+
         bounds = square_bounds(radius)
 
-        # When west goes past the date line (180), it should open up to full range
-        if bounds.west > bounds.east:
-            assert bounds.west == -180.0
-            assert bounds.east == 180.0
+        assert _contains(bounds, origin)
+        assert _contains(bounds, across_the_pole)
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "square_bounds does not wrap longitude at the antimeridian: from "
+            "179E the 'east' bound comes out as 183.5, a longitude no stored "
+            "repeater can have, so anything between -180 and -176.5 is dropped. "
+            "https://github.com/MicaelJarniac/repeaterbook/issues/77"
+        ),
+    )
+    def test_radius_crossing_the_antimeridian_keeps_nearby_points_inside(
+        self,
+    ) -> None:
+        """A bounding box must reach across the date line when the radius does."""
+        origin = LatLon(lat=0.0, lon=179.0)
+        radius = Radius(origin=origin, distance=500, unit=Unit.KILOMETERS)
+        # Just across the date line. Well inside the radius.
+        across_the_line = LatLon(lat=0.0, lon=-179.5)
+        assert haversine(origin, across_the_line, unit=Unit.KILOMETERS) < 500
+
+        bounds = square_bounds(radius)
+
+        assert _contains(bounds, across_the_line)
 
     def test_equator(self) -> None:
         """square_bounds should work at equator."""
