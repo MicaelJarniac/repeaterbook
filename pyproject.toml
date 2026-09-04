@@ -116,7 +116,10 @@ release = [
     "python-semantic-release>=10.6.1",
 ]
 automation = [
-    "nox[uv]>=2025.2.9",
+    # 2026.2.9 passes `uv venv --clear`, which uv>=0.10 requires to replace an
+    # existing venv. Older nox left the directory for uv to clobber, so every
+    # session failed on its second local run (#79).
+    "nox[uv]>=2026.2.9",
 ]
 dev = [
     {include-group = "tests"},
