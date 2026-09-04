@@ -3,7 +3,7 @@
   "name": "io.github.MicaelJarniac/repeaterbook",
   "title": "RepeaterBook",
   "description": "Look up amateur radio repeaters from RepeaterBook.com by location, band, and mode.",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "repository": {
     "url": "https://github.com/MicaelJarniac/repeaterbook",
     "source": "github"
@@ -14,7 +14,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "repeaterbook",
-      "version": "0.11.2",
+      "version": "0.11.3",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

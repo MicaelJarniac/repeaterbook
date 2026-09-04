@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.11.3 (2026-09-04)
+
+### Bug Fixes
+
+- **deps**: Bump nox to >=2026.2.9 so sessions survive a second local run
+  ([`07c03a4`](https://github.com/MicaelJarniac/repeaterbook/commit/07c03a43fff90caf753e51aa9681216f2b65ed94))
+
+
 ## v0.11.2 (2026-09-04)
 
 ### Bug Fixes
