@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v0.11.2 (2026-09-04)
+
+### Bug Fixes
+
+- **release**: Keep the changelog updating under PSR v10
+  ([`ef3f46c`](https://github.com/MicaelJarniac/repeaterbook/commit/ef3f46c135457ac72dd5fcb04c881ff15ccc80a8))
+
+### Chores
+
+- **deps-dev**: Bump mkdocs-material in the uv group across 1 directory
+  ([`3898d43`](https://github.com/MicaelJarniac/repeaterbook/commit/3898d43f7a5a7194a96ae4219560ebe79d0083b9))
+
+- **wordlist**: Update
+  ([`e4c018d`](https://github.com/MicaelJarniac/repeaterbook/commit/e4c018db268dc857139a44d17e535facb406e60d))
+
+### Testing
+
+- Reach 100% line and branch coverage, and enforce it
+  ([`d9c792e`](https://github.com/MicaelJarniac/repeaterbook/commit/d9c792ef6c8bd170358e85573bf8b191015fb7cc))
+
+
 ## v0.11.1 (2026-09-02)
 
 ### Bug Fixes
