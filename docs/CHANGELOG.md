@@ -1,5 +1,196 @@
 # CHANGELOG
 
+<!-- version list -->
+
+## v0.11.1 (2026-09-02)
+
+### Bug Fixes
+
+- **ci**: Stop a failed asset upload from skipping the PyPI publish
+  ([`16b5be3`](https://github.com/MicaelJarniac/repeaterbook/commit/16b5be3cf61873f7c4dd55e74a22858cafcb0b0c))
+
+
+## v0.11.0 (2026-09-02)
+
+### Bug Fixes
+
+- **models**: Type ARES/RACES/SKYWARN/CANWARN as tri-state booleans
+  ([`33aef9f`](https://github.com/MicaelJarniac/repeaterbook/commit/33aef9f8115292774b75cf4fe62090ce208bf7a1))
+
+### Features
+
+- **database**: Rebuild the local database when its schema drifts
+  ([`5aa339a`](https://github.com/MicaelJarniac/repeaterbook/commit/5aa339ab65af579d7482a81602d87db9c0aa6ce7))
+
+### Breaking Changes
+
+- **models**: Repeater.ares, .races, .skywarn and .canwarn are now `bool | None` instead of `str |
+  None`. Replace `== "Yes"` with `== True`, and note that a null check no longer means "supported":
+  None is a third state meaning the export did not report it. An existing database is discarded and
+  rebuilt on first use, since its columns hold the old text.
+
+
+## v0.10.2 (2026-09-01)
+
+### Bug Fixes
+
+- Raise RepeaterBookCacheError on cache write failure
+  ([`7e891bf`](https://github.com/MicaelJarniac/repeaterbook/commit/7e891bf9db8479066327eb1f5ef4c565f508f943))
+
+
+## v0.10.1 (2026-09-01)
+
+### Bug Fixes
+
+- **mcp**: Validate settings at startup
+  ([`e1c40e4`](https://github.com/MicaelJarniac/repeaterbook/commit/e1c40e48c6753dee9f7581f7bdc3e5d3aea079f0))
+
+### Chores
+
+- **deps**: Bump tornado from 6.5.7 to 6.5.8
+  ([`6e79bfd`](https://github.com/MicaelJarniac/repeaterbook/commit/6e79bfd156107ed0b7b72d8958ec554d5b929a32))
+
+### Documentation
+
+- Compare emcomm fields to "Yes", not to null
+  ([`50f2c8b`](https://github.com/MicaelJarniac/repeaterbook/commit/50f2c8ba6b35e0e6e67df32f069ed67001fe5b76))
+
+- Correct broken and inaccurate code examples
+  ([`fd8a49c`](https://github.com/MicaelJarniac/repeaterbook/commit/fd8a49cfda9e8a830a94cb07f728db97a7a6b48c))
+
+- Cover all submodules in the API reference and fix dead links
+  ([`7330f34`](https://github.com/MicaelJarniac/repeaterbook/commit/7330f341c0441c15823d12685e9af9554de86f88))
+
+- Document the MCP subpackage in the API reference
+  ([`1b26a26`](https://github.com/MicaelJarniac/repeaterbook/commit/1b26a26cef3827f8c40bc99f952ad4de489347aa))
+
+- Explain how to get an API token via App #114
+  ([`b465f99`](https://github.com/MicaelJarniac/repeaterbook/commit/b465f994c5c51328958afd27ad1284a0d5587ce9))
+
+- Rewrite architecture for the current codebase
+  ([`45023ee`](https://github.com/MicaelJarniac/repeaterbook/commit/45023eeba82ee5ba2d1dfb8d67e92a2521ba8a8d))
+
+
+## v0.10.0 (2026-08-31)
+
+### Documentation
+
+- Update .all-contributorsrc [skip ci]
+  ([`5971b17`](https://github.com/MicaelJarniac/repeaterbook/commit/5971b17ca14c605cb3cc492f4356acdd08006419))
+
+- Update docs/README.md [skip ci]
+  ([`1a0e155`](https://github.com/MicaelJarniac/repeaterbook/commit/1a0e155c09a2ca8cd6f77d4158ca0d305d69f455))
+
+### Features
+
+- **mcp**: Declare the server in the MCP Registry
+  ([`5c07d1b`](https://github.com/MicaelJarniac/repeaterbook/commit/5c07d1b08cb1516e40ef0454e5fd22a303b1e998))
+
+
+## v0.9.1 (2026-08-31)
+
+### Bug Fixes
+
+- **mcp**: Stop overriding the approved User-Agent contact
+  ([`44fb0b9`](https://github.com/MicaelJarniac/repeaterbook/commit/44fb0b90f7b1f36dda4b9e019aa31bef79cf397f))
+
+### Documentation
+
+- Replace the User-Agent override example in usage.md
+  ([`fab0e98`](https://github.com/MicaelJarniac/repeaterbook/commit/fab0e98c00925f42b6cdd40da5bafc6cd8914e0f))
+
+
+## v0.9.0 (2026-08-27)
+
+### Features
+
+- **spec**: Expose linking node fields on RepeaterSpec
+  ([`571ca47`](https://github.com/MicaelJarniac/repeaterbook/commit/571ca47142d1648ec4027d0a127e55ddd8c7e38a))
+
+
+## v0.8.4 (2026-08-27)
+
+### Bug Fixes
+
+- **spec**: Make last_update timezone-aware for RFC 3339 output
+  ([`e2eed21`](https://github.com/MicaelJarniac/repeaterbook/commit/e2eed210e236e2d6742a3a506673e9cc0fcb9789))
+
+### Documentation
+
+- Update .all-contributorsrc [skip ci]
+  ([`c9edcbe`](https://github.com/MicaelJarniac/repeaterbook/commit/c9edcbee7c988f5ce07f0e9cf77faadc62c5f232))
+
+- Update docs/README.md [skip ci]
+  ([`5767376`](https://github.com/MicaelJarniac/repeaterbook/commit/5767376ec851373d17caaadee0807e12fd0acbf6))
+
+
+## v0.8.3 (2026-08-26)
+
+### Bug Fixes
+
+- **meta**: Surface the MCP server in project metadata and correct stale claims
+  ([`dfb82f3`](https://github.com/MicaelJarniac/repeaterbook/commit/dfb82f37593d32c843cee12b8666e876863845d0))
+
+### Documentation
+
+- Update .all-contributorsrc [skip ci]
+  ([`639ee6e`](https://github.com/MicaelJarniac/repeaterbook/commit/639ee6edd80483cab884e39a8a688433fb24da93))
+
+- Update .all-contributorsrc [skip ci]
+  ([`9e0919f`](https://github.com/MicaelJarniac/repeaterbook/commit/9e0919f8d04b8ca6e28164de590f59241396ccc0))
+
+- Update docs/README.md [skip ci]
+  ([`b8a78e7`](https://github.com/MicaelJarniac/repeaterbook/commit/b8a78e7264d86b4b3e15223dadedd588fc472646))
+
+- Update docs/README.md [skip ci]
+  ([`7d8c8a5`](https://github.com/MicaelJarniac/repeaterbook/commit/7d8c8a5b70de3769870432d3a207b168fba37406))
+
+
+## v0.8.2 (2026-08-26)
+
+### Bug Fixes
+
+- **services**: Skip unmodellable export rows instead of failing the batch
+  ([`a79abc3`](https://github.com/MicaelJarniac/repeaterbook/commit/a79abc326ffa4de020e2ce96aa437df9a14f3f21))
+
+
+## v0.8.1 (2026-08-26)
+
+### Bug Fixes
+
+- **ci**: Run the GitHub publish step from the locked environment too
+  ([`06d0f1f`](https://github.com/MicaelJarniac/repeaterbook/commit/06d0f1fdc994c6e986f5a7a9729024ef1be3d37d))
+
+
+## v0.8.0 (2026-08-26)
+
+### Bug Fixes
+
+- **ci**: Run semantic-release from the locked environment
+  ([`4f008ff`](https://github.com/MicaelJarniac/repeaterbook/commit/4f008ff9693e7d79acda25f0956373036073a126))
+
+- **ci**: Upgrade semantic-release to v10 and pin 0.x versioning
+  ([`ad12bcd`](https://github.com/MicaelJarniac/repeaterbook/commit/ad12bcd254af014bf67109af27999bda29167cc9))
+
+### Chores
+
+- **deps**: Bump aiohttp from 3.14.1 to 3.14.3
+  ([`dcb5fc1`](https://github.com/MicaelJarniac/repeaterbook/commit/dcb5fc1b65092b8c2f60c0332a75751a03dd22b0))
+
+- **deps**: Bump gitpython from 3.1.54 to 3.1.57
+  ([`a97e581`](https://github.com/MicaelJarniac/repeaterbook/commit/a97e581c4fb0837bac145e69e4c730c937a1caa5))
+
+- **deps**: Bump gitpython from 3.1.57 to 3.1.58
+  ([`8c566dd`](https://github.com/MicaelJarniac/repeaterbook/commit/8c566dd4aa61e6cab22fbfb469eed809f0ce24e3))
+
+- **deps**: Bump pymdown-extensions from 11.0 to 11.0.1
+  ([`fc6cc18`](https://github.com/MicaelJarniac/repeaterbook/commit/fc6cc18c8c5e39548cf51d240966443bc796dd5c))
+
+### Features
+
+- **mcp**: Add an MCP server and promote the repeater-spec contract into core
+  ([`ad1021a`](https://github.com/MicaelJarniac/repeaterbook/commit/ad1021a618d902fe971a0f8176990147cb209832))
+
 
 ## v0.7.0 (2026-07-28)
 
