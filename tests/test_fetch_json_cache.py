@@ -97,6 +97,77 @@ async def test_fetch_json_refreshes_cache_when_stale(
         assert state["calls"] == expected_refreshed_count
 
 
+@pytest.mark.anyio
+async def test_fetch_json_defaults_cache_dir_to_cwd(
+    tmp_path: StdPath,
+    monkeypatch: pytest.MonkeyPatch,
+    local_server: Any,  # noqa: ANN401
+) -> None:
+    """With no cache_dir, the entry lands in the working directory.
+
+    `RepeaterBookAPI` always supplies one, so this default only matters for a
+    caller using `fetch_json` directly. chdir into tmp_path so the file the
+    test writes does not land in the repository.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    async def handler(_: web.Request) -> web.Response:
+        return web.json_response({"ok": True})
+
+    async with local_server(handler) as url:
+        result = await fetch_json(url)
+
+    assert result == {"ok": True}
+    assert len(list(tmp_path.glob("api_cache_*.json"))) == 1
+
+
+class TestCacheDir:
+    """`RepeaterBookAPI.cache_dir()` creates the directory once, then reuses it."""
+
+    @pytest.mark.anyio
+    async def test_existing_cache_dir_is_reused(self, tmp_path: StdPath) -> None:
+        """A second call finds the directory and leaves its contents alone.
+
+        Every fetch goes through `cache_dir()`, so this is the steady-state
+        path: recreating the directory or rewriting the `.gitignore` on each
+        call would be needless I/O at best and clobber a user's edits at worst.
+        """
+        api = RepeaterBookAPI(working_dir=Path(tmp_path))
+        first = await api.cache_dir()
+        gitignore = tmp_path / ".repeaterbook_cache" / ".gitignore"
+        gitignore.write_text("*\n!keep-me\n", encoding="utf-8")
+
+        second = await api.cache_dir()
+
+        assert second == first
+        assert gitignore.read_text(encoding="utf-8") == "*\n!keep-me\n"
+
+    @pytest.mark.anyio
+    async def test_gitignore_already_present_is_not_rewritten(
+        self,
+        tmp_path: StdPath,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A `.gitignore` that appears with the directory is kept as-is.
+
+        Not reachable through the filesystem alone -- a directory that did not
+        exist cannot already hold a file -- but it is the branch that protects
+        the file once `mkdir` succeeds, so pin it by having `mkdir` plant one.
+        """
+        original_mkdir = Path.mkdir
+
+        async def mkdir_with_gitignore(self: Path, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
+            await original_mkdir(self, *args, **kwargs)
+            await (self / ".gitignore").write_text("custom\n", encoding="utf-8")
+
+        monkeypatch.setattr(Path, "mkdir", mkdir_with_gitignore)
+
+        api = RepeaterBookAPI(working_dir=Path(tmp_path))
+        cache = await api.cache_dir()
+
+        assert await (cache / ".gitignore").read_text(encoding="utf-8") == "custom\n"
+
+
 class TestCacheErrors:
     """A failing cache *write* is a library error, not a silent miss."""
 

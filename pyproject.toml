@@ -211,6 +211,21 @@ prerelease_token = "rc"
 [tool.coverage.run]
 source = ["src"]
 command_line = "-m pytest"
+# Line coverage alone let two of `urls_export`'s four routing inputs go
+# untested while reporting the line green (#69). Branches catch that.
+branch = true
+# On 3.14 coverage defaults to the sys.monitoring core, which mis-traces
+# triply-nested `with` blocks (`_download_to_cache` is one) and reports
+# phantom partial branches. The settrace core gets them right. Drop this once
+# https://github.com/coveragepy/coveragepy/issues/1987 is fixed; tracked in
+# https://github.com/MicaelJarniac/repeaterbook/issues/78.
+core = "ctrace"
+
+[tool.coverage.report]
+# The bar is 100% (docs/CONTRIBUTING.md), so make `pytest --cov` say so
+# instead of leaving it to Codecov to notice after the fact.
+fail_under = 100
+show_missing = true
 
 [tool.pytest.ini_options]
 # addopts = "--cov"
