@@ -29,5 +29,5 @@ class PopulatedDbFactory(Protocol):
     """Return type of the ``populated_db`` fixture: a seeded-DB factory."""
 
     def __call__(self, *repeaters: Repeater) -> RepeaterBook:
-        """Build a temp-dir RepeaterBook seeded with the given repeaters."""
+        """Seed the test's temp-dir RepeaterBook with the given repeaters."""
         ...

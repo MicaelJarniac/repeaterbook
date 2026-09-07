@@ -9,7 +9,7 @@ import os
 import sqlite3
 from contextlib import closing
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import attrs
 from anyio import Path
@@ -23,6 +23,7 @@ from repeaterbook.models import (
 
 if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Iterable, Sequence
+    from types import TracebackType
 
     from sqlalchemy import Engine
     from sqlalchemy.sql._typing import _ColumnExpressionArgument
@@ -68,6 +69,12 @@ class RepeaterBook:
     cannot be re-downloaded from RepeaterBook, so when the schema in code no
     longer matches the schema the file was written with, the file is discarded
     and rebuilt rather than migrated. Keep your own data somewhere else.
+
+    The underlying engine and its connection pool are created lazily on first
+    use and live until `close()` is called, so use the instance as a context
+    manager (or call `close()` yourself) to release the SQLite handle when you
+    are done. Closing is optional: an instance that is never closed still
+    works, and its connections are finalized when it is garbage collected.
     """
 
     working_dir: Path = attrs.Factory(Path)
@@ -101,6 +108,43 @@ class RepeaterBook:
         SQLModel.metadata.create_all(engine)
         self._record_fingerprint(engine)
         return engine
+
+    def close(self) -> None:
+        """Dispose of the engine and release its pooled SQLite connections.
+
+        The instance stays usable: the next access to `engine` (directly or
+        via `populate`, `query` or `truncate`) builds a fresh one, re-running
+        the staleness check. Calling this on an instance whose engine was
+        never built, or that is already closed, is a no-op.
+
+        Any `Session` you built against the old `engine` yourself is not
+        tracked here; close those first.
+        """
+        # `attrs.frozen` makes the class slotted, so the cached engine lives in
+        # a slot rather than `__dict__`, and `del self.engine` is refused by
+        # the frozen `__delattr__`. Going through `object` bypasses both the
+        # freeze and attrs' lazy-building `__getattr__`: an empty slot raises
+        # rather than constructing an engine only to throw it away.
+        try:
+            engine: Engine = object.__getattribute__(self, "engine")
+        except AttributeError:
+            return
+        object.__delattr__(self, "engine")
+        engine.dispose()
+        logger.debug(f"Closed database at {self.database_path}.")
+
+    def __enter__(self) -> Self:
+        """Enter the runtime context; the engine is still built lazily."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Exit the runtime context, releasing the database handle."""
+        self.close()
 
     def _discard_if_stale(self) -> None:
         """Delete the database file if it predates the current schema.

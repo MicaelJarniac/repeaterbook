@@ -230,6 +230,36 @@ rb = RepeaterBook(working_dir=Path("/tmp"), database="repeaters.db")
     keep anything in this file that you are not willing to lose; write your
     own data somewhere else.
 
+### Closing the Database
+
+The SQLite engine behind a `RepeaterBook` is opened on first use and held
+open, with its connection pool, until you release it. Use the instance as a
+context manager, or call `close()` yourself, when you are done:
+
+```python
+with RepeaterBook(database="repeaters.db") as rb:
+    rb.populate(repeaters)
+    results = rb.query(band(Bands.M_2))
+# The handle is released here, even if the block raised.
+
+# Equivalent, for long-lived objects that outlive a single block
+rb = RepeaterBook(database="repeaters.db")
+try:
+    ...
+finally:
+    rb.close()
+```
+
+Closing is optional. An instance you never close keeps working, and its
+connections are finalized when it is garbage collected; closing just makes
+that moment yours to choose. It matters most when something else needs the
+file afterwards -- deleting it, moving it, or opening it from another process
+-- and on Windows, where an open handle blocks deletion outright.
+
+A closed instance is not retired: the next `query()` or `populate()` opens a
+fresh engine against the same file, and `close()` on an instance that was
+never used (or is already closed) is a no-op.
+
 ### Populating the Database
 
 Use `populate()` to add repeaters to the database:
@@ -832,13 +862,12 @@ api = RepeaterBookAPI(max_cache_age=timedelta(minutes=30))
 ### Reuse Database Connection
 
 ```python
-# Create once
-rb = RepeaterBook(database="repeaters.db")
-
-# Reuse for multiple queries
-results1 = rb.query(band(Bands.M_2))
-results2 = rb.query(band(Bands.CM_70))
-results3 = rb.query(Repeater.dmr_capable == True)
+# Create once, close once
+with RepeaterBook(database="repeaters.db") as rb:
+    # Reuse for multiple queries
+    results1 = rb.query(band(Bands.M_2))
+    results2 = rb.query(band(Bands.CM_70))
+    results3 = rb.query(Repeater.dmr_capable == True)
 ```
 
 ## Error Handling

@@ -196,6 +196,23 @@ cannot express, construct a `Session` against its `engine` yourself.
 Building the engine creates the schema, so `init_db()` is available but rarely
 needed.
 
+The engine's lifetime is the caller's to end. `close()` disposes it — draining
+the connection pool and releasing the file — and clears the cached property, so
+the next use rebuilds one and re-runs the staleness check below. `__enter__` and
+`__exit__` wrap that, making `with RepeaterBook(...) as rb:` the natural shape.
+Closing is optional rather than required: a handle that is never closed still
+works and is finalized at garbage collection, which is how every version before
+this one behaved. What `close()` adds is a *deterministic* moment of release,
+which is what a long-lived process (the MCP server), a caller holding a
+`Session` on the engine, or Windows — where an open handle blocks deletion —
+actually needs.
+
+Frozen attrs classes are slotted, so the cached engine lives in a slot and
+`del rb.engine` is refused by the frozen `__delattr__`. `close()` reaches the
+slot through `object.__getattribute__` and `object.__delattr__`, which also
+sidesteps the lazy build: peeking at an empty slot raises instead of creating an
+engine only to dispose of it.
+
 #### The database is a cache, so schema drift wipes it
 
 There is no migration machinery, and deliberately so: the file holds nothing
@@ -342,6 +359,11 @@ an MCP caller, so `SyncResult` carries a `truncated` flag and advice on
 narrowing scope. And blocking work (SQLite reads plus the haversine pass) is
 dispatched to a worker thread so concurrent tool calls aren't serialized behind
 it.
+
+The server is the one place a `RepeaterBook` lives for the whole process. Its
+shared context is built once, on demand, by an `lru_cache`d factory; a FastMCP
+lifespan closes the database when the server stops. Building stays outside the
+lifespan on purpose, so tools still work under a harness that never enters one.
 
 ## Testing
 
