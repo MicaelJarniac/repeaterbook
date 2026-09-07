@@ -20,6 +20,7 @@ from repeaterbook.spec import RepeaterMode, RepeaterStatus, RepeaterUse
 from repeaterbook.utils import LatLon
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from repeaterbook.models import Repeater
@@ -59,15 +60,22 @@ async def _row_handler(_: web.Request) -> web.Response:
     return web.json_response({"count": 1, "results": [_ROW_RESULT]})
 
 
+@pytest.fixture
+def db(tmp_path: Path) -> Iterator[RepeaterBook]:
+    """An empty, unopened RepeaterBook in the temp dir, closed at teardown."""
+    with RepeaterBook(working_dir=AsyncPath(tmp_path)) as db:
+        yield db
+
+
 async def test_sync_downloads_and_populates(
     local_server: Any,  # noqa: ANN401
     tmp_path: Path,
+    db: RepeaterBook,
 ) -> None:
     """Test sync downloads repeaters from the ROW endpoint and populates the DB."""
     async with local_server(_row_handler, path="/api/exportROW.php") as url:
         base = URL.build(scheme=url.scheme, host=url.host, port=url.port)
         api = RepeaterBookAPI(base_url=base, working_dir=AsyncPath(tmp_path))
-        db = RepeaterBook(working_dir=AsyncPath(tmp_path))
         query = ExportQuery(countries=frozenset({countries.get(name="Australia")}))
 
         result = await sync(api, db, query)
@@ -80,11 +88,14 @@ async def test_sync_downloads_and_populates(
 
 
 @pytest.fixture
-def populated_db(tmp_path: Path) -> PopulatedDbFactory:
-    """Return a factory that builds a DB pre-populated with the given repeaters."""
+def populated_db(db: RepeaterBook) -> PopulatedDbFactory:
+    """Return a factory that seeds the test's DB with the given repeaters.
+
+    Every call seeds the same `db` fixture instance, so the handle is closed
+    once at teardown no matter how many times the factory was invoked.
+    """
 
     def _populate(*repeaters: Repeater) -> RepeaterBook:
-        db = RepeaterBook(working_dir=AsyncPath(tmp_path))
         if repeaters:
             db.populate(repeaters)
         else:
@@ -240,6 +251,7 @@ def test_search_filters_by_use_alone(
 async def test_sync_flags_a_truncated_response(
     local_server: Any,  # noqa: ANN401
     tmp_path: Path,
+    db: RepeaterBook,
 ) -> None:
     """A response at the API's cap must be reported as probably incomplete.
 
@@ -257,7 +269,6 @@ async def test_sync_flags_a_truncated_response(
         api = RepeaterBookAPI(
             base_url=base, working_dir=AsyncPath(tmp_path), max_count=3
         )
-        db = RepeaterBook(working_dir=AsyncPath(tmp_path))
         query = ExportQuery(countries=frozenset({countries.get(name="Australia")}))
 
         result = await sync(api, db, query)
@@ -271,6 +282,7 @@ async def test_sync_flags_a_truncated_response(
 async def test_sync_reports_skipped_rows(
     local_server: Any,  # noqa: ANN401
     tmp_path: Path,
+    db: RepeaterBook,
 ) -> None:
     """An unmodellable row must be counted, not silently dropped from the total."""
 
@@ -285,7 +297,6 @@ async def test_sync_reports_skipped_rows(
     async with local_server(_handler, path="/api/exportROW.php") as url:
         base = URL.build(scheme=url.scheme, host=url.host, port=url.port)
         api = RepeaterBookAPI(base_url=base, working_dir=AsyncPath(tmp_path))
-        db = RepeaterBook(working_dir=AsyncPath(tmp_path))
         query = ExportQuery(countries=frozenset({countries.get(name="Australia")}))
 
         result = await sync(api, db, query)
@@ -299,6 +310,7 @@ async def test_sync_reports_skipped_rows(
 async def test_sync_counts_skipped_rows_towards_truncation(
     local_server: Any,  # noqa: ANN401
     tmp_path: Path,
+    db: RepeaterBook,
 ) -> None:
     """A skipped row still consumed a slot against the API's cap.
 
@@ -319,7 +331,6 @@ async def test_sync_counts_skipped_rows_towards_truncation(
         api = RepeaterBookAPI(
             base_url=base, working_dir=AsyncPath(tmp_path), max_count=3
         )
-        db = RepeaterBook(working_dir=AsyncPath(tmp_path))
         query = ExportQuery(countries=frozenset({countries.get(name="Australia")}))
 
         result = await sync(api, db, query)

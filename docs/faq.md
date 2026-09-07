@@ -174,14 +174,15 @@ asyncio.run(api.download(query=ExportQuery(countries={brazil})))
 This occurs when multiple processes access the same database. Solutions:
 
 1. **Use different database files** for concurrent access
-2. **Close connections** properly with context managers
+2. **Close the handle** when you are done -- use `RepeaterBook` as a context
+   manager, or call `close()` -- so the file is free for whatever comes next
 3. **Use a single RepeaterBook instance** per database file
 
 ```python
 # Good
-rb = RepeaterBook(database="repeaters.db")
-results1 = rb.query(...)
-results2 = rb.query(...)
+with RepeaterBook(database="repeaters.db") as rb:
+    results1 = rb.query(...)
+    results2 = rb.query(...)
 
 # Bad (multiple instances to same file)
 rb1 = RepeaterBook(database="repeaters.db")
@@ -322,9 +323,12 @@ from sqlmodel import Session, select
 
 # `RepeaterBook` opens a session per call internally and exposes the engine,
 # so build your own `Session` when you need a statement it can't express.
+# Keep it inside the `with rb:` block: `rb.close()` disposes the engine, and
+# a session built on it should be finished with before that happens.
 statement = select(Repeater).limit(100)
-with Session(rb.engine) as session:
-    results = session.exec(statement).all()
+with RepeaterBook(database="repeaters.db") as rb:
+    with Session(rb.engine) as session:
+        results = session.exec(statement).all()
 ```
 
 ### Database is getting large

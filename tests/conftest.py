@@ -140,12 +140,14 @@ def mcp_env(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[McpEnvFactory]:
-    """Configure the MCP server's env and clear its cached context.
+    """Configure the MCP server's env and reset its cached context.
 
     `_get_context` is `lru_cache`d, so env changes are invisible until the
     cache is dropped -- both before the test (to pick up this env) and after
     (so a cached context built from `tmp_path` doesn't leak into the next
-    test).
+    test). Resetting goes through `_close_context` rather than a bare
+    `cache_clear()` so the previous context's database handle is closed, not
+    left for the garbage collector to finalize with a `ResourceWarning`.
     """
     from repeaterbook.mcp import server  # noqa: PLC0415
 
@@ -159,8 +161,8 @@ def mcp_env(
             monkeypatch.setenv("REPEATERBOOK_APP_TOKEN", token)
         for key, value in env.items():
             monkeypatch.setenv(key, value)
-        server._get_context.cache_clear()  # noqa: SLF001
+        server._close_context()  # noqa: SLF001
 
     yield _configure
 
-    server._get_context.cache_clear()  # noqa: SLF001
+    server._close_context()  # noqa: SLF001

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from fastmcp import Client
 from pydantic import ValidationError
 
 from repeaterbook.exceptions import RepeaterBookUnauthorizedError
@@ -17,6 +18,7 @@ from repeaterbook.spec import RepeaterMode
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from repeaterbook.database import RepeaterBook
     from tests._types import McpEnvFactory, SampleRepeaterFactory
 
 pytestmark = pytest.mark.anyio
@@ -139,7 +141,7 @@ def test_missing_token_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.delenv("REPEATERBOOK_APP_TOKEN", raising=False)
     monkeypatch.setenv("REPEATERBOOK_APP_CONTACT", "test@example.com")
-    server._get_context.cache_clear()  # noqa: SLF001
+    server._close_context()  # noqa: SLF001
 
     with pytest.raises(ValidationError, match="app_token"):
         server.RepeaterBookSettings.model_validate({})
@@ -186,7 +188,7 @@ def test_working_dir_is_created_and_tilde_expanded(
     monkeypatch.setenv("REPEATERBOOK_WORKING_DIR", "~/.repeaterbook")
     monkeypatch.setenv("REPEATERBOOK_APP_CONTACT", "test@example.com")
     monkeypatch.setenv("REPEATERBOOK_APP_TOKEN", "rbuapp_test")
-    server._get_context.cache_clear()  # noqa: SLF001
+    server._close_context()  # noqa: SLF001
 
     target = tmp_path / ".repeaterbook"
     assert not target.exists()
@@ -196,7 +198,7 @@ def test_working_dir_is_created_and_tilde_expanded(
         assert target.is_dir()
         assert str(ctx.db.working_dir) == str(target)
     finally:
-        server._get_context.cache_clear()  # noqa: SLF001
+        server._close_context()  # noqa: SLF001
 
 
 def test_context_is_cached(mcp_env: McpEnvFactory) -> None:
@@ -204,6 +206,70 @@ def test_context_is_cached(mcp_env: McpEnvFactory) -> None:
     mcp_env()
 
     assert server._get_context() is server._get_context()  # noqa: SLF001
+
+
+def _engine_is_built(db: RepeaterBook) -> bool:
+    """Peek at the engine slot without building an engine by asking."""
+    try:
+        object.__getattribute__(db, "engine")
+    except AttributeError:
+        return False
+    return True
+
+
+def test_close_context_closes_the_db_and_forgets_it(mcp_env: McpEnvFactory) -> None:
+    """Test resetting the context releases its database handle first.
+
+    `cache_clear()` alone would drop the only reference and leave the engine's
+    pool to the garbage collector; the point of `_close_context` is that the
+    handle is closed deterministically before the context is forgotten.
+    """
+    mcp_env()
+    before = server._get_context()  # noqa: SLF001
+    assert _engine_is_built(before.db)
+
+    server._close_context()  # noqa: SLF001
+
+    assert not _engine_is_built(before.db)
+    assert server._get_context() is not before  # noqa: SLF001
+
+
+def test_close_context_without_a_context_builds_nothing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test closing when nothing is cached does not construct a context.
+
+    Shutting down must not read the environment or create the working
+    directory as a side effect. With no token set, building one would raise,
+    so this doubles as the no-op guarantee.
+    """
+    monkeypatch.delenv("REPEATERBOOK_APP_TOKEN", raising=False)
+    monkeypatch.setenv("REPEATERBOOK_WORKING_DIR", str(tmp_path / "never"))
+    server._close_context()  # noqa: SLF001
+
+    server._close_context()  # noqa: SLF001
+
+    assert not (tmp_path / "never").exists()
+
+
+async def test_server_lifespan_closes_the_db_on_shutdown(
+    mcp_env: McpEnvFactory,
+) -> None:
+    """Test a served session releases the database when the server stops.
+
+    The MCP server is the one long-lived holder of a `RepeaterBook`, so it is
+    where a never-disposed engine would otherwise live for the whole process.
+    """
+    mcp_env()
+
+    async with Client(server.mcp) as client:
+        await client.call_tool("get_repeater", {"source_id": "CA:999999"})
+        ctx = server._get_context()  # noqa: SLF001
+        assert _engine_is_built(ctx.db)
+
+    assert not _engine_is_built(ctx.db)
+    assert server._get_context.cache_info().currsize == 0  # noqa: SLF001
 
 
 async def test_sync_wraps_auth_failure(

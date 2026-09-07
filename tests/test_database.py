@@ -9,16 +9,28 @@ from typing import TYPE_CHECKING
 
 import pytest
 from loguru import logger
-from sqlalchemy import String
-from sqlmodel import col
+from sqlalchemy import String, event
+from sqlmodel import Session, col, select
 
 from repeaterbook.database import RepeaterBook, schema_fingerprint
 from repeaterbook.models import Repeater, Status, Use
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path as StdPath
 
 from anyio import Path
+
+
+@pytest.fixture
+def rb(tmp_path: StdPath) -> Iterator[RepeaterBook]:
+    """A RepeaterBook in a fresh temp dir, closed at teardown.
+
+    Closing matters here: the suite runs with `ResourceWarning` as an error,
+    so an engine left to the garbage collector fails the test that leaked it.
+    """
+    with RepeaterBook(working_dir=Path(tmp_path)) as rb:
+        yield rb
 
 
 @pytest.fixture
@@ -94,18 +106,16 @@ class TestRepeaterBookDatabase:
         rb = RepeaterBook(working_dir=Path(tmp_path), database="custom.db")
         assert "custom.db" in str(rb.database_path)
 
-    def test_init_db_creates_tables(self, tmp_path: StdPath) -> None:
+    def test_init_db_creates_tables(self, rb: RepeaterBook, tmp_path: StdPath) -> None:
         """init_db should create the database tables."""
-        rb = RepeaterBook(working_dir=Path(tmp_path))
         rb.init_db()
         # Check that database file exists
         assert (tmp_path / "repeaterbook.db").exists()
 
     def test_populate_inserts_repeaters(
-        self, tmp_path: StdPath, sample_repeater: Repeater
+        self, rb: RepeaterBook, sample_repeater: Repeater
     ) -> None:
         """Populate should insert repeaters into the database."""
-        rb = RepeaterBook(working_dir=Path(tmp_path))
         rb.populate([sample_repeater])
 
         # Query should return the repeater
@@ -115,11 +125,9 @@ class TestRepeaterBookDatabase:
         assert results[0].repeater_id == 123
 
     def test_populate_merges_duplicates(
-        self, tmp_path: StdPath, sample_repeater: Repeater
+        self, rb: RepeaterBook, sample_repeater: Repeater
     ) -> None:
         """Populate should merge (update) existing repeaters."""
-        rb = RepeaterBook(working_dir=Path(tmp_path))
-
         # Insert initial repeater
         rb.populate([sample_repeater])
 
@@ -180,11 +188,9 @@ class TestRepeaterBookDatabase:
         assert results[0].location_nearest_city == "Updated City"
 
     def test_query_with_where_clause(
-        self, tmp_path: StdPath, sample_repeater: Repeater
+        self, rb: RepeaterBook, sample_repeater: Repeater
     ) -> None:
         """Query should filter with where clause."""
-        rb = RepeaterBook(working_dir=Path(tmp_path))
-
         # Insert multiple repeaters with different states
         repeaters = [
             sample_repeater,
@@ -249,18 +255,16 @@ class TestRepeaterBookDatabase:
         assert len(results) == 1
         assert results[0].state_id == "TX"
 
-    def test_query_empty_database(self, tmp_path: StdPath) -> None:
+    def test_query_empty_database(self, rb: RepeaterBook) -> None:
         """Query on empty database should return empty list."""
-        rb = RepeaterBook(working_dir=Path(tmp_path))
         rb.init_db()
         results = rb.query()
         assert len(results) == 0
 
     def test_emergency_fields_round_trip(
-        self, tmp_path: StdPath, sample_repeater: Repeater
+        self, rb: RepeaterBook, sample_repeater: Repeater
     ) -> None:
         """All three emergency states survive a write and read back."""
-        rb = RepeaterBook(working_dir=Path(tmp_path))
         rb.populate([sample_repeater])
 
         (result,) = rb.query()
@@ -269,14 +273,13 @@ class TestRepeaterBookDatabase:
         assert result.skywarn is None
 
     def test_emergency_fields_are_queryable_by_bool(
-        self, tmp_path: StdPath, sample_repeater: Repeater
+        self, rb: RepeaterBook, sample_repeater: Repeater
     ) -> None:
         """`== True` and `== False` select in SQL and do not collide.
 
         The bug this replaces: as strings, `== True` matched nothing while a
         null check matched everything, including explicit `"No"` rows.
         """
-        rb = RepeaterBook(working_dir=Path(tmp_path))
         rb.populate([sample_repeater])
 
         assert len(rb.query(Repeater.ares == True)) == 1  # noqa: E712
@@ -341,9 +344,11 @@ class TestStaleDatabaseIsDiscarded:
     file it cannot trust rather than migrating it.
     """
 
-    def test_fresh_database_is_stamped(self, tmp_path: StdPath) -> None:
+    def test_fresh_database_is_stamped(
+        self, rb: RepeaterBook, tmp_path: StdPath
+    ) -> None:
         """A newly created database records the schema it was built with."""
-        RepeaterBook(working_dir=Path(tmp_path)).init_db()
+        rb.init_db()
 
         assert _read_marker(tmp_path / "repeaterbook.db") == [
             ("repeaterbook_schema", schema_fingerprint())
@@ -353,17 +358,20 @@ class TestStaleDatabaseIsDiscarded:
         self, tmp_path: StdPath, sample_repeater: Repeater
     ) -> None:
         """A file matching the current schema survives, data intact."""
-        RepeaterBook(working_dir=Path(tmp_path)).populate([sample_repeater])
+        with RepeaterBook(working_dir=Path(tmp_path)) as writer:
+            writer.populate([sample_repeater])
 
         # A second instance re-runs the staleness check from scratch.
-        assert len(RepeaterBook(working_dir=Path(tmp_path)).query()) == 1
+        with RepeaterBook(working_dir=Path(tmp_path)) as reader:
+            assert len(reader.query()) == 1
 
     def test_stale_database_is_discarded(
         self, tmp_path: StdPath, sample_repeater: Repeater
     ) -> None:
         """A file stamped with a different schema is wiped, not migrated."""
         db = tmp_path / "repeaterbook.db"
-        RepeaterBook(working_dir=Path(tmp_path)).populate([sample_repeater])
+        with RepeaterBook(working_dir=Path(tmp_path)) as writer:
+            writer.populate([sample_repeater])
 
         connection = sqlite3.connect(db)
         with connection:
@@ -372,11 +380,14 @@ class TestStaleDatabaseIsDiscarded:
             )
         connection.close()
 
-        assert RepeaterBook(working_dir=Path(tmp_path)).query() == []
+        with RepeaterBook(working_dir=Path(tmp_path)) as reader:
+            assert reader.query() == []
         # Rebuilt and re-stamped, rather than merely deleted.
         assert _read_marker(db) == [("repeaterbook_schema", schema_fingerprint())]
 
-    def test_unmarked_database_is_discarded(self, tmp_path: StdPath) -> None:
+    def test_unmarked_database_is_discarded(
+        self, rb: RepeaterBook, tmp_path: StdPath
+    ) -> None:
         """A file predating this mechanism has no marker, so it goes.
 
         This is the upgrade path for anyone holding a database written by an
@@ -390,23 +401,28 @@ class TestStaleDatabaseIsDiscarded:
             connection.execute("INSERT INTO repeater VALUES ('CA', 'Yes')")
         connection.close()
 
-        assert RepeaterBook(working_dir=Path(tmp_path)).query() == []
+        assert rb.query() == []
         assert _read_marker(db) == [("repeaterbook_schema", schema_fingerprint())]
 
-    def test_corrupt_file_is_discarded(self, tmp_path: StdPath) -> None:
+    def test_corrupt_file_is_discarded(
+        self, rb: RepeaterBook, tmp_path: StdPath
+    ) -> None:
         """A file that is not a database at all is replaced, not raised over."""
         db = tmp_path / "repeaterbook.db"
         db.write_bytes(b"this is not a sqlite database")
 
-        assert RepeaterBook(working_dir=Path(tmp_path)).query() == []
+        assert rb.query() == []
         assert _read_marker(db) == [("repeaterbook_schema", schema_fingerprint())]
 
-    def test_missing_database_is_queryable(self, tmp_path: StdPath) -> None:
+    def test_missing_database_is_queryable(self, rb: RepeaterBook) -> None:
         """A never-populated working directory reads as empty, not an error."""
-        assert RepeaterBook(working_dir=Path(tmp_path)).query() == []
+        assert rb.query() == []
 
     def test_discard_warns(
-        self, tmp_path: StdPath, caplog: pytest.LogCaptureFixture
+        self,
+        rb: RepeaterBook,
+        tmp_path: StdPath,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Losing cached data is visible, not silent."""
         db = tmp_path / "repeaterbook.db"
@@ -418,7 +434,7 @@ class TestStaleDatabaseIsDiscarded:
         # loguru does not feed pytest's caplog handler by default.
         handler_id = logger.add(caplog.handler, level="WARNING", format="{message}")
         try:
-            RepeaterBook(working_dir=Path(tmp_path)).query()
+            rb.query()
         finally:
             logger.remove(handler_id)
 
@@ -429,18 +445,20 @@ class TestStaleDatabaseIsDiscarded:
         self, tmp_path: StdPath, caplog: pytest.LogCaptureFixture
     ) -> None:
         """The happy path stays quiet."""
-        RepeaterBook(working_dir=Path(tmp_path)).init_db()
+        with RepeaterBook(working_dir=Path(tmp_path)) as writer:
+            writer.init_db()
 
         handler_id = logger.add(caplog.handler, level="WARNING", format="{message}")
         try:
-            RepeaterBook(working_dir=Path(tmp_path)).query()
+            with RepeaterBook(working_dir=Path(tmp_path)) as reader:
+                reader.query()
         finally:
             logger.remove(handler_id)
 
         assert "Discarding" not in caplog.text
 
     def test_truncate_empties_rows_but_keeps_the_marker(
-        self, tmp_path: StdPath, sample_repeater: Repeater
+        self, rb: RepeaterBook, tmp_path: StdPath, sample_repeater: Repeater
     ) -> None:
         """Clearing the data must not make the file look stale.
 
@@ -448,7 +466,6 @@ class TestStaleDatabaseIsDiscarded:
         survive -- otherwise the next open would "discard" a database that is
         perfectly current.
         """
-        rb = RepeaterBook(working_dir=Path(tmp_path))
         rb.populate([sample_repeater])
 
         rb.truncate()
@@ -457,3 +474,142 @@ class TestStaleDatabaseIsDiscarded:
         assert _read_marker(tmp_path / "repeaterbook.db") == [
             ("repeaterbook_schema", schema_fingerprint())
         ]
+
+
+def _engine_is_built(rb: RepeaterBook) -> bool:
+    """Report whether `rb` holds an engine, without building one by asking.
+
+    `rb.engine` would construct the engine as a side effect of looking, so
+    peek at the slot through `object` the same way `close()` does.
+    """
+    try:
+        object.__getattribute__(rb, "engine")
+    except AttributeError:
+        return False
+    return True
+
+
+class TestClose:
+    """Tests for releasing the database handle.
+
+    `engine` is a `cached_property` on a frozen, slotted class, so nothing
+    released it before `close()` existed: the pool lived until the instance
+    was collected, and callers had no supported way to let go of the file.
+    """
+
+    def test_close_disposes_the_engine(self, tmp_path: StdPath) -> None:
+        """Closing closes the pooled DBAPI connection and drops the engine."""
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+        rb.init_db()
+        closed: list[object] = []
+        # The pool's `close` event fires once per DBAPI connection it closes.
+        event.listen(
+            rb.engine, "close", lambda dbapi_conn, _: closed.append(dbapi_conn)
+        )
+        assert closed == []
+
+        rb.close()
+
+        assert len(closed) == 1
+        assert not _engine_is_built(rb)
+
+    def test_close_without_an_engine_is_a_noop(self, tmp_path: StdPath) -> None:
+        """Closing a never-used instance neither fails nor builds an engine."""
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+
+        rb.close()
+
+        assert not _engine_is_built(rb)
+        assert not (tmp_path / "repeaterbook.db").exists()
+
+    def test_close_is_idempotent(self, tmp_path: StdPath) -> None:
+        """A second close is harmless."""
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+        rb.init_db()
+        rb.close()
+
+        rb.close()
+
+        assert not _engine_is_built(rb)
+
+    def test_instance_is_reusable_after_close(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """Closing releases the handle; it does not retire the instance.
+
+        The next use builds a fresh engine against the same file, so the data
+        written before the close is still there.
+        """
+        with RepeaterBook(working_dir=Path(tmp_path)) as rb:
+            rb.populate([sample_repeater])
+            first = rb.engine
+            rb.close()
+
+            assert len(rb.query()) == 1
+            assert rb.engine is not first
+
+    def test_context_manager_yields_self_and_closes(self, tmp_path: StdPath) -> None:
+        """`with` hands back the same instance and closes it on exit."""
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+
+        with rb as entered:
+            assert entered is rb
+            rb.init_db()
+            assert _engine_is_built(rb)
+
+        assert not _engine_is_built(rb)
+
+    def test_context_manager_closes_on_error(self, tmp_path: StdPath) -> None:
+        """An exception inside the block still releases the handle."""
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+
+        def _use_and_fail() -> None:
+            with rb:
+                rb.init_db()
+                msg = "boom"
+                raise RuntimeError(msg)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            _use_and_fail()
+
+        assert not _engine_is_built(rb)
+
+    def test_entering_does_not_build_the_engine(self, tmp_path: StdPath) -> None:
+        """The engine stays lazy: `with` alone touches nothing on disk."""
+        with RepeaterBook(working_dir=Path(tmp_path)) as rb:
+            assert not _engine_is_built(rb)
+        assert not (tmp_path / "repeaterbook.db").exists()
+
+    def test_close_releases_the_file(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """After closing, the file can be removed and the instance recovers.
+
+        This is the Windows case from the issue: an open handle blocks
+        deletion, and the staleness check deletes. With the handle released,
+        the file is free, and the next use rebuilds an empty, current one.
+        """
+        rb = RepeaterBook(working_dir=Path(tmp_path))
+        rb.populate([sample_repeater])
+        rb.close()
+
+        (tmp_path / "repeaterbook.db").unlink()
+
+        assert rb.query() == []
+        rb.close()
+
+    def test_documented_session_escape_hatch(
+        self, tmp_path: StdPath, sample_repeater: Repeater
+    ) -> None:
+        """The pattern the docs recommend works inside a `with` block.
+
+        `faq.md` tells callers to build their own `Session` on `rb.engine`
+        for statements the wrapper cannot express; that is the usage that
+        most needs a defined lifetime.
+        """
+        with RepeaterBook(working_dir=Path(tmp_path)) as rb:
+            rb.populate([sample_repeater])
+            with Session(rb.engine) as session:
+                rows = session.exec(select(Repeater).limit(1)).all()
+            assert len(rows) == 1
+        assert not _engine_is_built(rb)

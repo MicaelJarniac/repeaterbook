@@ -246,6 +246,17 @@ show_missing = true
 markers = [
   "integration: hits the live repeaterbook.com API (disabled by default)",
 ]
+filterwarnings = [
+  # A `RepeaterBook` engine left to the garbage collector surfaces as an
+  # "unclosed database" ResourceWarning at finalization (#68). Both lines are
+  # needed to fail the run: the warning is raised inside a finalizer, where
+  # it cannot propagate, so Python hands it to `sys.unraisablehook` and pytest
+  # re-reports it as PytestUnraisableExceptionWarning. Left as a warning, that
+  # is exactly the 46-line summary the issue describes on an otherwise green
+  # suite.
+  "error::ResourceWarning",
+  "error::pytest.PytestUnraisableExceptionWarning",
+]
 
 [tool.inline-snapshot]
 format-command = "ruff format --stdin-filename {filename}"

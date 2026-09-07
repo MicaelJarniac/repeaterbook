@@ -13,11 +13,12 @@ __all__: tuple[str, ...] = (
 
 import pathlib
 from functools import lru_cache
-from typing import Annotated, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import attrs
 from anyio import Path, to_thread
 from fastmcp import FastMCP
+from fastmcp.server.lifespan import lifespan
 from loguru import logger
 from pycountry import countries
 from pycountry.db import Country  # noqa: TC002
@@ -39,7 +40,27 @@ from repeaterbook.spec import (
 )
 from repeaterbook.utils import LatLon
 
-mcp = FastMCP("repeaterbook")
+if TYPE_CHECKING:  # pragma: no cover
+    from collections.abc import AsyncIterator
+
+
+@lifespan
+async def _lifespan(_: FastMCP[Any]) -> AsyncIterator[None]:
+    """Release the shared database handle when the server shuts down.
+
+    The context is built by `_get_context` on demand (and eagerly by `main`),
+    not here, so tools keep working under a harness that never enters the
+    lifespan. What this adds is the other end: a server that was started
+    properly also lets go of its SQLite connections when it stops, instead of
+    leaving them to the garbage collector.
+    """
+    try:
+        yield
+    finally:
+        _close_context()
+
+
+mcp = FastMCP("repeaterbook", lifespan=_lifespan)
 
 _MODE_TO_API: dict[RepeaterMode, Mode] = {
     RepeaterMode.FM: Mode.ANALOG,
@@ -132,6 +153,22 @@ def _get_context() -> _Context:
     db = RepeaterBook(working_dir=working_dir)
     db.init_db()
     return _Context(api=api, db=db)
+
+
+def _close_context() -> None:
+    """Close the cached context's database and forget the context.
+
+    `cache_clear()` alone drops the reference but leaves the engine's
+    connection pool to the garbage collector, so close the handle first.
+    Only a context that is already built is touched: building one just to
+    close it would read the environment and create the working directory as
+    a side effect of shutting down.
+    """
+    try:
+        if _get_context.cache_info().currsize:
+            _get_context().db.close()
+    finally:
+        _get_context.cache_clear()
 
 
 def _api_modes(modes: set[RepeaterMode] | None) -> frozenset[Mode]:
