@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.11.4 (2026-09-07)
+
+### Bug Fixes
+
+- **database**: Give RepeaterBook a close() and context manager to dispose its engine
+  ([`b1f04b4`](https://github.com/MicaelJarniac/repeaterbook/commit/b1f04b4d48c4e09690123630b17824418d159fff))
+
+
 ## v0.11.3 (2026-09-04)
 
 ### Bug Fixes
