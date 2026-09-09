@@ -14,12 +14,13 @@ __all__: tuple[str, ...] = (
     "square_bounds",
 )
 
+import math
 from decimal import Decimal
-from typing import Annotated, NamedTuple
+from typing import Annotated, Final, NamedTuple
 
 from annotated_types import Ge, Gt, Le, MultipleOf
 from annotated_types import Unit as UnitOf
-from haversine import Direction, Unit, inverse_haversine  # type: ignore[import-untyped]
+from haversine import Unit, haversine  # type: ignore[import-untyped]
 from pydantic import Field
 from typing_extensions import TypeAliasType
 
@@ -157,27 +158,67 @@ class SquareBounds(NamedTuple):
     west: float
 
 
-def square_bounds(radius: Radius) -> SquareBounds:
-    """Get square bounds around a point."""
-    north = inverse_haversine(
-        radius.origin, radius.distance, Direction.NORTH, unit=radius.unit
-    )[0]
-    south = inverse_haversine(
-        radius.origin, radius.distance, Direction.SOUTH, unit=radius.unit
-    )[0]
-    east = inverse_haversine(
-        radius.origin, radius.distance, Direction.EAST, unit=radius.unit
-    )[1]
-    west = inverse_haversine(
-        radius.origin, radius.distance, Direction.WEST, unit=radius.unit
-    )[1]
+# Nudge every bound outward by this much (about 0.1 mm on the ground) so a
+# repeater sitting exactly on the rim is not lost to floating-point noise in
+# the trigonometry. Far below any coordinate's precision, far above an ulp.
+_PADDING_DEG: Final[float] = 1e-9
 
-    # If we've gone all the way around, things get messy. Just open it up to everything.
-    if south > north:
-        north = 90.0
-        south = -90.0
-    if west > east:
-        west = -180.0
+
+def _angular_radius(radius: Radius) -> float:
+    """Convert a surface distance to the angle it subtends at the Earth's centre.
+
+    Derived from `haversine` itself, so the conversion uses the same Earth
+    radius and per-unit scale as `filter_radius`. Half a turn along the
+    equator is exactly pi radians of arc, whatever the unit.
+    """
+    half_turn: float = haversine((0.0, 0.0), (0.0, 180.0), unit=radius.unit)
+    return math.pi * radius.distance / half_turn
+
+
+def square_bounds(radius: Radius) -> SquareBounds:
+    """Get the lat/lon box that contains every point within `radius`.
+
+    This is the coarse pre-filter behind `queries.square`, so it must never
+    exclude a point that is actually in range; `filter_radius` does the exact
+    check afterwards. Over-approximating is harmless, under-approximating
+    silently drops repeaters. The bounds are therefore the true extremes of the
+    circle, not merely the points due north/south/east/west of the origin, and
+    are padded by a hair against rounding:
+
+    * Latitude spans `lat ± r` (`r` in degrees of arc) and is clamped to the
+      poles. A circle that reaches a pole wraps around it and covers every
+      longitude, so the box is opened east-west.
+    * Longitude is widest where a meridian is tangent to the circle, which
+      lies poleward of the origin, not due east/west of it. Spherical
+      trigonometry gives that half-width as `asin(sin r / cos lat)`.
+    * A circle that straddles the antimeridian would need two boxes.
+      `Repeater.longitude` is stored in `[-180, 180]`, so a bound pushed past
+      either edge would exclude the far side; the box is opened east-west
+      instead, and the exact pass tightens it.
+    * Past half the circumference the whole globe is in range.
+    """
+    lat, lon = radius.origin
+    arc = _angular_radius(radius)
+    if arc >= math.pi:
+        return SquareBounds(north=90.0, south=-90.0, east=180.0, west=-180.0)
+
+    delta = math.degrees(arc) + _PADDING_DEG
+    north = lat + delta
+    south = lat - delta
+    if north >= 90.0 or south <= -90.0:  # noqa: PLR2004 - the poles
+        return SquareBounds(
+            north=min(north, 90.0), south=max(south, -90.0), east=180.0, west=-180.0
+        )
+
+    # Neither pole is reached, so the circle lies strictly between them and
+    # `cos(lat) > sin(arc)` holds: the ratio is inside `asin`'s domain. `min`
+    # only absorbs rounding when both sides are within an ulp of 1.
+    ratio = min(1.0, math.sin(arc) / math.cos(math.radians(lat)))
+    half_width = math.degrees(math.asin(ratio)) + _PADDING_DEG
+    east = lon + half_width
+    west = lon - half_width
+    if east > 180.0 or west < -180.0:  # noqa: PLR2004 - the antimeridian
         east = 180.0
+        west = -180.0
 
     return SquareBounds(north=north, south=south, east=east, west=west)
