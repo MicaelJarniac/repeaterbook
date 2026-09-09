@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.12.0 (2026-09-09)
+
+### Refactoring
+
+- **models**: Share RepeaterBook's boolean vocabulary between JSON and CSV ingest
+  ([`00bb987`](https://github.com/MicaelJarniac/repeaterbook/commit/00bb987cbc6851a988ea897be60faa1b83620d18))
+
+### Breaking Changes
+
+- **models**: Csv_export.YES is removed, and services.BOOL_MAP has moved to models.BOOL_MAP. Decode
+  capability cells with models.parse_flag() instead of comparing against a constant.
+
+
 ## v0.11.5 (2026-09-09)
 
 ### Bug Fixes
