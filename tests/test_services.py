@@ -29,7 +29,6 @@ from repeaterbook.models import (
     Use,
 )
 from repeaterbook.services import (
-    BOOL_MAP,
     STATUS_MAP,
     USE_MAP,
     RepeaterBookAPI,
@@ -45,26 +44,6 @@ if TYPE_CHECKING:
     from pycountry.db import Country
 
 from anyio import Path
-
-
-class TestBoolMap:
-    """Tests for BOOL_MAP constant."""
-
-    def test_yes_is_true(self) -> None:
-        """'Yes' should map to True."""
-        assert BOOL_MAP["Yes"] is True
-
-    def test_no_is_false(self) -> None:
-        """'No' should map to False."""
-        assert BOOL_MAP["No"] is False
-
-    def test_one_is_true(self) -> None:
-        """1 should map to True."""
-        assert BOOL_MAP[1] is True
-
-    def test_zero_is_false(self) -> None:
-        """0 should map to False."""
-        assert BOOL_MAP[0] is False
 
 
 class TestUseMap:
@@ -263,6 +242,31 @@ class TestJsonToModel:
         minimal_payload["Operational Status"] = "Sporadic"
         rep = json_to_model(minimal_payload)  # type: ignore[arg-type]
         assert rep.operational_status == Status.UNKNOWN
+
+    def test_bad_boolean_type_names_the_field(
+        self, minimal_payload: dict[str, Any]
+    ) -> None:
+        """A non-scalar in a boolean field raises TypeError naming the field.
+
+        The decoding is `models.parse_flag`, which cannot know the key. The
+        wrapper here re-raises with the key so a skipped-row log line says
+        *which* field was malformed, and chains the original as the cause.
+        """
+        minimal_payload["DMR"] = ["Yes"]
+        pattern = r"boolean field DMR: <class 'list'>"
+        with pytest.raises(TypeError, match=pattern) as exc:
+            json_to_model(minimal_payload)  # type: ignore[arg-type]
+        assert isinstance(exc.value.__cause__, TypeError)
+
+    def test_bool_flags_share_the_csv_decoder(
+        self, minimal_payload: dict[str, Any]
+    ) -> None:
+        """Every capability flag goes through `parse_flag`, whitespace and all."""
+        minimal_payload["DMR"] = " Yes "
+        minimal_payload["NXDN"] = ""
+        rep = json_to_model(minimal_payload)  # type: ignore[arg-type]
+        assert rep.dmr_capable is True
+        assert rep.nxdn_capable is False
 
 
 class TestRowLabel:

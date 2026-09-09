@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 __all__: tuple[str, ...] = (
+    "BOOL_MAP",
     "Emergency",
     "EmergencyJSON",
     "ErrorJSON",
@@ -25,13 +26,14 @@ __all__: tuple[str, ...] = (
     "UseJSON",
     "YesNoJSON",
     "ZeroOneJSON",
+    "parse_flag",
     "parse_yes_no",
 )
 
 from datetime import date
 from decimal import Decimal
 from enum import Enum, auto
-from typing import Literal, TypeAlias, TypedDict
+from typing import Final, Literal, TypeAlias, TypedDict
 
 import attrs
 from pycountry.db import Country  # noqa: TC002
@@ -94,11 +96,82 @@ class ServiceType(Enum):
     GMRS = auto()
 
 
+BOOL_MAP: Final[dict[str | int, bool]] = {
+    "Yes": True,
+    "No": False,
+    1: True,
+    0: False,
+}
+"""RepeaterBook's boolean vocabulary, stated once.
+
+The JSON export mixes the `"Yes"`/`"No"` strings with `1`/`0` integers
+(`Precise` is the integer one); the CSV export uses the strings only. Both
+ingest paths decode through `parse_flag` and `parse_yes_no`, so this is the
+single place that spells out what a truthy or falsy cell looks like on the
+wire.
+
+Deliberately *not* in here: the CSV's blank cell, which that export uses where
+the JSON would say `"No"`. `parse_flag` reads a blank as its default, and
+`parse_yes_no` must keep reading it as unknown; an `"": False` entry would
+break the second to spare the first a keyword argument.
+"""
+
+
+def parse_flag(raw: object, *, default: bool = False) -> bool:
+    """Decode a two-state capability flag such as `DMR` or `FM Analog`.
+
+    These fields are "does this repeater do X", where the export has no way
+    to say "unknown": a repeater either has the capability or it doesn't. So
+    unlike the tri-state `parse_yes_no`, anything unrecognized collapses to
+    `default`, and the answer is always a `bool`.
+
+    - `"Yes"` or `1` -> `True`.
+    - `"No"` or `0` -> `False`.
+    - `None`, `""`, whitespace, or any unrecognized string -> `default`.
+
+    The two exports disagree on the negative case. JSON sends the literal
+    `"No"`; the CSV leaves the cell blank. Both land on `False` here: `"No"`
+    through the vocabulary, blank through `default`. That is deliberate --
+    the blank-means-no convention is the CSV's, and the decoder relies on
+    `default` for it rather than a second spelling in `BOOL_MAP`.
+
+    Surrounding whitespace is stripped from strings, matching `parse_yes_no`.
+    Matching is case-sensitive: RepeaterBook only ever sends `"Yes"`/`"No"`,
+    so a differently-cased value is unrecognized rather than reinterpreted.
+
+    Args:
+        raw: The cell as the export delivered it.
+        default: What an absent, blank, or unrecognized cell decodes to.
+
+    Returns:
+        The decoded flag.
+
+    Raises:
+        TypeError: If `raw` is neither a string, an integer, nor `None`. A
+            list or a dict in a boolean field is a malformed row, not a
+            missing value, and should be reported as such rather than
+            silently defaulted.
+    """
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        # bool subclasses int, so True/False would otherwise fall through to
+        # the integer lookup and resolve via `1`/`0`. Accept them directly;
+        # the export never sends them, but nothing is gained by refusing.
+        return raw
+    if isinstance(raw, str):
+        return BOOL_MAP.get(raw.strip(), default)
+    if isinstance(raw, int):
+        return BOOL_MAP.get(raw, default)
+    msg = f"Invalid type for boolean field: {type(raw)}"
+    raise TypeError(msg)
+
+
 def parse_yes_no(raw: object) -> bool | None:
     """Decode RepeaterBook's `"Yes"`/`"No"` vocabulary into a tri-state boolean.
 
     The emergency-service fields are genuinely three-valued, which is why this
-    returns `None` rather than defaulting to `False` the way `services.b()`
+    returns `None` rather than defaulting to `False` the way `parse_flag`
     does for the capability flags:
 
     - `"Yes"` -> `True`, the service is supported.
@@ -109,9 +182,12 @@ def parse_yes_no(raw: object) -> bool | None:
     entirely, so every rest-of-world repeater is unknown rather than
     unsupported. Collapsing unknown into `False` would assert something the
     export never said.
+
+    Only the string half of `BOOL_MAP` applies. These four fields never use
+    the `1`/`0` spelling, so an integer here is unrecognized, not a yes or no.
     """
     if isinstance(raw, str):
-        return {"Yes": True, "No": False}.get(raw.strip())
+        return BOOL_MAP.get(raw.strip())
     return None
 
 
