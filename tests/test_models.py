@@ -11,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from repeaterbook.models import (
+    BOOL_MAP,
     Emergency,
     ExportNorthAmericaQuery,
     ExportQuery,
@@ -20,6 +21,7 @@ from repeaterbook.models import (
     ServiceType,
     Status,
     Use,
+    parse_flag,
     parse_yes_no,
 )
 from repeaterbook.spec import (
@@ -499,6 +501,110 @@ def test_accessors_do_not_change_persistence_surface(
 def test_parse_yes_no(raw: object, expected: bool | None) -> None:  # noqa: FBT001
     """parse_yes_no maps the wire vocabulary to a tri-state boolean."""
     assert parse_yes_no(raw) is expected
+
+
+class TestBoolMap:
+    """`BOOL_MAP` is the one statement of RepeaterBook's boolean vocabulary."""
+
+    def test_string_half(self) -> None:
+        """The `"Yes"`/`"No"` spelling both exports use."""
+        assert BOOL_MAP["Yes"] is True
+        assert BOOL_MAP["No"] is False
+
+    def test_integer_half(self) -> None:
+        """The `1`/`0` spelling the JSON export mixes in (`Precise`)."""
+        assert BOOL_MAP[1] is True
+        assert BOOL_MAP[0] is False
+
+    def test_nothing_else(self) -> None:
+        """Exactly four entries: a fifth spelling is a deliberate decision.
+
+        In particular the CSV's blank-means-no is *not* in here. `parse_flag`
+        gets that from its `default`, and `parse_yes_no` must keep reading a
+        blank as unknown, which an `"": False` entry would silently break.
+        """
+        assert set(BOOL_MAP) == {"Yes", "No", 1, 0}
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Yes", True),
+        ("No", False),
+        (1, True),
+        (0, False),
+        # Whitespace shows up in community-maintained data.
+        (" Yes ", True),
+        # bool is a subclass of int; accept it directly rather than via 1/0.
+        (True, True),
+        (False, False),
+        # Absent, blank, and unrecognized all take the default. The blank case
+        # is the CSV's spelling of "No", so the default doing that work is
+        # load-bearing, not incidental.
+        (None, False),
+        ("", False),
+        ("   ", False),
+        ("Maybe", False),
+        # Case-sensitive, same as parse_yes_no.
+        ("yes", False),
+        ("YES", False),
+        # Unlisted integers are unrecognized, not truthy.
+        (2, False),
+        (-1, False),
+    ],
+)
+def test_parse_flag(raw: object, expected: bool) -> None:  # noqa: FBT001
+    """parse_flag decodes both wire spellings into a plain bool."""
+    result = parse_flag(raw)
+    assert result is expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [None, "", "   ", "Maybe", "yes", 2],
+)
+def test_parse_flag_default_governs_unrecognized(raw: object) -> None:
+    """Whatever cannot be decoded takes `default`, whichever way it points."""
+    assert parse_flag(raw, default=True) is True
+    assert parse_flag(raw, default=False) is False
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("Yes", True), ("No", False), (1, True), (0, False)],
+)
+def test_parse_flag_default_does_not_override_recognized(
+    raw: object,
+    expected: bool,  # noqa: FBT001
+) -> None:
+    """A recognized value wins over the default, whichever way it points."""
+    assert parse_flag(raw, default=not expected) is expected
+
+
+@pytest.mark.parametrize("raw", [[], {}, 1.0, b"Yes", object()])
+def test_parse_flag_rejects_non_scalar_types(raw: object) -> None:
+    """A list or dict in a boolean field is a malformed row, not a blank.
+
+    `json_to_models` relies on this: `TypeError` is in `ROW_ERRORS`, so the
+    row is skipped and reported instead of quietly defaulting to False.
+    """
+    with pytest.raises(TypeError, match="Invalid type for boolean field"):
+        parse_flag(raw)
+
+
+def test_parse_flag_and_parse_yes_no_agree_on_the_vocabulary() -> None:
+    """Both decoders read `BOOL_MAP`, so they cannot drift on Yes/No.
+
+    Where they differ is by design and is pinned separately: absent is
+    `False` for a two-state flag and `None` for a tri-state one, and the
+    integer spelling is only meaningful for the flags.
+    """
+    for raw, expected in BOOL_MAP.items():
+        assert parse_flag(raw) is expected
+        if isinstance(raw, str):
+            assert parse_yes_no(raw) is expected
+        else:
+            assert parse_yes_no(raw) is None
 
 
 def test_emergency_services_empty_when_all_unknown(

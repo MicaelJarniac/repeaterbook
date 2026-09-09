@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 __all__: tuple[str, ...] = (
-    "YES",
     "csv_row_to_model",
     "csv_to_models",
 )
@@ -11,15 +10,19 @@ __all__: tuple[str, ...] = (
 import csv
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, cast
 
-from repeaterbook.models import Repeater, RepeaterCSV, Status, Use, parse_yes_no
+from repeaterbook.models import (
+    Repeater,
+    RepeaterCSV,
+    Status,
+    Use,
+    parse_flag,
+    parse_yes_no,
+)
 
 if TYPE_CHECKING:
     import io
-
-
-YES: Final = "Yes"
 
 
 def csv_row_to_model(c: RepeaterCSV, /) -> Repeater:
@@ -53,16 +56,19 @@ def csv_row_to_model(c: RepeaterCSV, /) -> Repeater:
             echolink_node=c["EchoLink Node"] or None,
             irlp_node=c["IRLP Node"] or None,
             wires_node=c["WIRES-X Node"] or None,
-            analog_capable=c["FM (analog)"] == YES,
-            dmr_capable=c["DMR"] == YES,
+            # Two-state, same decoder as the JSON path. The CSV spells "not
+            # supported" as a blank cell rather than "No"; `parse_flag`'s
+            # default covers that, so both exports land on False.
+            analog_capable=parse_flag(c["FM (analog)"]),
+            dmr_capable=parse_flag(c["DMR"]),
             dmr_color_code=c["DMR Color Code"],
-            d_star_capable=c["D-STAR Node"] == YES,
-            nxdn_capable=c["NXDN"] == YES,
-            apco_p_25_capable=c["P25"] == YES,
+            d_star_capable=parse_flag(c["D-STAR Node"]),
+            nxdn_capable=parse_flag(c["NXDN"]),
+            apco_p_25_capable=parse_flag(c["P25"]),
             p_25_nac=c["P25 NAC"] or None,
-            tetra_capable=c["TETRA"] == YES,
-            yaesu_system_fusion_capable=c["System Fusion"] == YES,
-            m17_capable=c["M17"] == YES,
+            tetra_capable=parse_flag(c["TETRA"]),
+            yaesu_system_fusion_capable=parse_flag(c["System Fusion"]),
+            m17_capable=parse_flag(c["M17"]),
             pl_ctcss_tsq_downlink=parse_tone(c["TSQ Tone"]),
             # MISSING:
             state_id="",

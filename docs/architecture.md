@@ -115,6 +115,19 @@ endpoints genuinely disagree about which ones they send.
 `.value` is an integer with no external meaning. Use `.name` for a label — and
 see [spec](#spec) for why the published contract uses separate string enums.
 
+**RepeaterBook's boolean vocabulary is stated once, here.** `BOOL_MAP` records
+that a truthy cell is `"Yes"` or `1` and a falsy one `"No"` or `0`, and two
+decoders read it. `parse_flag()` is for the two-state capability flags
+(`DMR`, `FM Analog`, …): anything unrecognized collapses to a default, because
+a repeater either has a capability or it doesn't. `parse_yes_no()` is for the
+tri-state emergency-service fields, where an absent value must stay `None` —
+the export declining to say is not the export saying no. Both the JSON and the
+CSV ingest paths import these from `models`, which is the module they already
+share, rather than the CSV reader reaching into the HTTP client for a
+constant. One consequence worth knowing: the two exports disagree on the
+negative case. JSON sends the literal `"No"`, the CSV leaves the cell blank,
+and `parse_flag()`'s default is what makes the blank read as `False`.
+
 ### services
 
 The API client is a frozen attrs class holding the base URL, the application

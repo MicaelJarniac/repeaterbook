@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 __all__: tuple[str, ...] = (
-    "BOOL_MAP",
     "ROW_ERRORS",
     "STATUS_MAP",
     "USE_MAP",
@@ -57,6 +56,7 @@ from repeaterbook.models import (
     ServiceTypeJSON,
     Status,
     Use,
+    parse_flag,
     parse_yes_no,
 )
 
@@ -280,14 +280,6 @@ async def fetch_json(
         return json.loads(await cache_file.read_text(encoding="utf-8"))
 
 
-BOOL_MAP: Final[dict[str | int, bool]] = {
-    "Yes": True,
-    "No": False,
-    1: True,
-    0: False,
-}
-
-
 USE_MAP: Final[dict[str, Use]] = {
     "OPEN": Use.OPEN,
     "PRIVATE": Use.PRIVATE,
@@ -339,13 +331,14 @@ def json_to_model(j: RepeaterJSON, /) -> Repeater:
         """Parse RepeaterBook boolean-ish fields.
 
         RepeaterBook uses a mix of "Yes"/"No" strings and 1/0 ints.
-        Missing/unknown values fall back to `default`.
+        Missing/unknown values fall back to `default`. The decoding itself is
+        `parse_flag`; this wrapper only adds the field name to the error.
         """
-        v = j.get(key)
-        if not (isinstance(v, (str, int)) or v is None):
-            msg = f"Invalid type for boolean field {key}: {type(v)}"
-            raise TypeError(msg)
-        return default if v is None else BOOL_MAP.get(v, default)
+        try:
+            return parse_flag(j.get(key), default=default)
+        except TypeError as exc:
+            msg = f"Invalid type for boolean field {key}: {type(j.get(key))}"
+            raise TypeError(msg) from exc
 
     def parse_fm_bandwidth(value: str) -> Decimal | None:
         """Parse FM Bandwidth field, which may include " kHz" suffix."""

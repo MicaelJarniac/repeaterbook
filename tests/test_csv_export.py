@@ -62,6 +62,72 @@ _BLANK_COLOR_CODE_ROW = (
     ",,,,,Yes,,,,,,,,,,,,,,CSQ,CSQ"
 )
 
+# A multi-mode repeater: "Yes" in FM, DMR, D-STAR, System Fusion and M17, with
+# every other capability cell blank. Column order after CANWARN is:
+#   AllStar, EchoLink, IRLP, WIRES-X Node, WIRES-X, FM (analog), ATV, DMR,
+#   DMR Color Code, D-STAR Node, D-STAR Service, NXDN, NXDN RAN, P25, P25 NAC,
+#   TETRA, System Fusion, M17, Wide Area, PL Tone, TSQ Tone
+_MULTI_MODE_ROW = (
+    "W1XYZ,442.100000,447.100000,5.0,CSQ,"
+    "Providence,Providence,RI,US,,41.82399368,-71.41283417,"
+    "Yes,Yes,No,No,"
+    ",,,,,Yes,,Yes,1,Yes,,,,,,,Yes,Yes,,CSQ,CSQ"
+)
+
+
+def test_csv_capability_flags_blank_means_not_supported() -> None:
+    """A blank capability cell is False: the CSV's spelling of "No".
+
+    This is the deliberate asymmetry with the emergency fields above. The JSON
+    export writes the literal `"No"`; the CSV writes nothing. Both must land
+    on False, and for a two-state flag there is no "unknown" to preserve.
+    """
+    (rep,) = csv_to_models(_csv(_MULTI_MODE_ROW))
+
+    assert rep.analog_capable is True
+    assert rep.dmr_capable is True
+    assert rep.d_star_capable is True
+    assert rep.yaesu_system_fusion_capable is True
+    assert rep.m17_capable is True
+    # Blank cells, not "No".
+    assert rep.nxdn_capable is False
+    assert rep.apco_p_25_capable is False
+    assert rep.tetra_capable is False
+
+
+def test_csv_capability_flags_match_json_path() -> None:
+    """The CSV and JSON exports decode a capability flag to the same bool.
+
+    The CSV path used to compare cells against a private `YES` constant while
+    the JSON path went through `BOOL_MAP`; two spellings of one vocabulary
+    (#72). Both now decode through `models.parse_flag`, so a row that says
+    the same thing in each format must produce the same flags.
+    """
+    (from_csv,) = csv_to_models(_csv(_MULTI_MODE_ROW))
+    from_json = json_to_model(
+        {
+            "State ID": "44",
+            "Rptr ID": 1,
+            "Frequency": "442.100000",
+            "Input Freq": "447.100000",
+            "Nearest City": "Providence",
+            "Lat": "41.82399368",
+            "Long": "-71.41283417",
+            "FM Analog": "Yes",
+            "DMR": "Yes",
+            "D-Star": "Yes",
+            "NXDN": "No",
+            "APCO P-25": "No",
+            "Tetra": "No",
+            "System Fusion": "Yes",
+            "M17": "Yes",
+            "Last Update": "2026-01-01",
+        }
+    )
+
+    assert from_csv.modes == from_json.modes
+    assert from_csv.modes  # and not vacuously: the row does carry modes.
+
 
 def test_csv_emergency_fields_decode_to_booleans() -> None:
     """`"Yes"`/`"No"` in the CSV decode the same way as in the JSON export."""
