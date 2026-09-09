@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.11.5 (2026-09-09)
+
+### Bug Fixes
+
+- **utils**: Make square_bounds enclose the whole circle
+  ([`ea44ec4`](https://github.com/MicaelJarniac/repeaterbook/commit/ea44ec49b344e00598b10a32bec494e8e5f06032))
+
+
 ## v0.11.4 (2026-09-07)
 
 ### Bug Fixes
