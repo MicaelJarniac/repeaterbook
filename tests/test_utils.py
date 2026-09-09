@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-from haversine import Unit, haversine  # type: ignore[import-untyped]
+import math
+
+from haversine import Unit, haversine, inverse_haversine  # type: ignore[import-untyped]
+from hypothesis import given
+from hypothesis import strategies as st
 
 from repeaterbook.utils import LatLon, Radius, SquareBounds, square_bounds
 
@@ -14,6 +17,27 @@ def _contains(bounds: SquareBounds, point: LatLon) -> bool:
         bounds.south <= point.lat <= bounds.north
         and bounds.west <= point.lon <= bounds.east
     )
+
+
+def _point_towards(radius: Radius, bearing: float, fraction: float = 1.0) -> LatLon:
+    """The point `fraction` of the way to the rim of `radius` along `bearing`.
+
+    Normalised into the domain `Repeater` coordinates are stored in, so it is
+    exactly what `queries.square` would be asked to match.
+    """
+    lat, lon = inverse_haversine(
+        radius.origin,
+        radius.distance * fraction,
+        bearing,
+        unit=radius.unit,
+        normalize_output=True,
+    )
+    return LatLon(lat=max(-90.0, min(90.0, lat)), lon=max(-180.0, min(180.0, lon)))
+
+
+def _in_range(radius: Radius, point: LatLon) -> bool:
+    """Whether `filter_radius` would keep `point`."""
+    return bool(haversine(radius.origin, point, unit=radius.unit) <= radius.distance)
 
 
 class TestLatLon:
@@ -103,16 +127,6 @@ class TestSquareBoundsFunction:
 
         assert bounds == SquareBounds(north=90.0, south=-90.0, east=180.0, west=-180.0)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "square_bounds only handles the past-the-antipode case. A radius that "
-            "crosses a pole produces a box that excludes the origin itself: the "
-            "great circle north from 89N comes back down the far side, so the "
-            "'north' bound lands *below* the origin. "
-            "https://github.com/MicaelJarniac/repeaterbook/issues/77"
-        ),
-    )
     def test_radius_crossing_a_pole_keeps_nearby_points_inside(self) -> None:
         """A bounding box must contain the origin and everything within the radius.
 
@@ -130,15 +144,28 @@ class TestSquareBoundsFunction:
         assert _contains(bounds, origin)
         assert _contains(bounds, across_the_pole)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "square_bounds does not wrap longitude at the antimeridian: from "
-            "179E the 'east' bound comes out as 183.5, a longitude no stored "
-            "repeater can have, so anything between -180 and -176.5 is dropped. "
-            "https://github.com/MicaelJarniac/repeaterbook/issues/77"
-        ),
-    )
+    def test_radius_crossing_a_pole_opens_longitude_and_clamps_latitude(
+        self,
+    ) -> None:
+        """A circle enclosing a pole spans every longitude; latitude stops at 90."""
+        radius = Radius(origin=LatLon(lat=89.0, lon=0.0), distance=500)
+
+        bounds = square_bounds(radius)
+
+        assert bounds.north == 90.0
+        assert bounds.south < 89.0
+        assert (bounds.west, bounds.east) == (-180.0, 180.0)
+
+    def test_radius_crossing_the_south_pole_is_symmetric(self) -> None:
+        """The south pole is handled like the north pole, clamped at -90."""
+        radius = Radius(origin=LatLon(lat=-89.0, lon=0.0), distance=500)
+
+        bounds = square_bounds(radius)
+
+        assert bounds.south == -90.0
+        assert bounds.north > -89.0
+        assert (bounds.west, bounds.east) == (-180.0, 180.0)
+
     def test_radius_crossing_the_antimeridian_keeps_nearby_points_inside(
         self,
     ) -> None:
@@ -152,6 +179,95 @@ class TestSquareBoundsFunction:
         bounds = square_bounds(radius)
 
         assert _contains(bounds, across_the_line)
+
+    def test_radius_crossing_the_antimeridian_westward_keeps_nearby_points_inside(
+        self,
+    ) -> None:
+        """Same as above, approaching the date line from the western hemisphere."""
+        origin = LatLon(lat=0.0, lon=-179.0)
+        radius = Radius(origin=origin, distance=500, unit=Unit.KILOMETERS)
+        across_the_line = LatLon(lat=0.0, lon=179.5)
+        assert haversine(origin, across_the_line, unit=Unit.KILOMETERS) < 500
+
+        bounds = square_bounds(radius)
+
+        assert _contains(bounds, across_the_line)
+        assert -180.0 <= bounds.west <= bounds.east <= 180.0
+
+    def test_longitude_bulges_poleward_of_the_origin(self) -> None:
+        """The widest point of a circle is not due east of its centre.
+
+        Away from the equator meridians converge, so the meridian tangent to
+        the circle touches it a little poleward of the origin, further east
+        than the point due east. A box that only reaches the due-east point
+        clips that bulge and drops in-range repeaters.
+        """
+        origin = LatLon(lat=60.0, lon=0.0)
+        radius = Radius(origin=origin, distance=500, unit=Unit.KILOMETERS)
+        # Slightly north of the origin, further east than the due-east point,
+        # and just inside the radius.
+        in_the_bulge = LatLon(lat=60.3, lon=9.0)
+        assert haversine(origin, in_the_bulge, unit=Unit.KILOMETERS) < 500
+        due_east = _point_towards(radius, bearing=math.pi / 2)
+        assert in_the_bulge.lon > due_east.lon
+
+        bounds = square_bounds(radius)
+
+        assert _contains(bounds, in_the_bulge)
+
+    def test_zero_radius_still_contains_the_origin(self) -> None:
+        """No distance: the box shrinks to the origin, padded by a hair.
+
+        Without the padding a repeater at the origin itself could be lost to
+        rounding: `haversine`'s own `asin(sin(lat))` round-trip can move a
+        point by an ulp, and a box with zero width has no room for that.
+        """
+        origin = LatLon(lat=34.0522, lon=-118.2437)
+
+        bounds = square_bounds(Radius(origin=origin, distance=0))
+
+        assert _contains(bounds, origin)
+        assert bounds.north - bounds.south < 1e-6
+        assert bounds.east - bounds.west < 1e-6
+
+    @given(
+        lat=st.floats(min_value=-90, max_value=90),
+        lon=st.floats(min_value=-180, max_value=180),
+        # Up to a bit past the antipode, so every branch is exercised.
+        distance=st.floats(min_value=0, max_value=25_000),
+        unit=st.sampled_from([Unit.KILOMETERS, Unit.MILES, Unit.METERS]),
+        bearing=st.floats(min_value=0, max_value=2 * math.pi),
+        # Mostly the rim, where the box is tightest, but the interior too.
+        fraction=st.one_of(st.just(1.0), st.floats(min_value=0, max_value=1)),
+    )
+    def test_box_keeps_everything_filter_radius_would_keep(  # noqa: PLR0913
+        self,
+        lat: float,
+        lon: float,
+        distance: float,
+        unit: Unit,
+        bearing: float,
+        fraction: float,
+    ) -> None:
+        """The property a pre-filter must have: nothing in range is left outside.
+
+        For any origin, radius and unit, the box contains the origin and every
+        point that `filter_radius` would then accept. Judging "in range" by the
+        same `haversine` call `filter_radius` makes keeps float noise out of
+        it: a rim point that lands a few ulps outside the radius is no loss,
+        since the exact pass would drop it anyway. The box also stays within
+        the domain `Repeater` coordinates are validated against, so a bound
+        can never point at a longitude no repeater has.
+        """
+        radius = Radius(origin=LatLon(lat=lat, lon=lon), distance=distance, unit=unit)
+        point = _point_towards(radius, bearing, fraction)
+
+        bounds = square_bounds(radius)
+
+        assert -90.0 <= bounds.south <= bounds.north <= 90.0
+        assert -180.0 <= bounds.west <= bounds.east <= 180.0
+        assert _contains(bounds, radius.origin)
+        assert not _in_range(radius, point) or _contains(bounds, point)
 
     def test_equator(self) -> None:
         """square_bounds should work at equator."""
