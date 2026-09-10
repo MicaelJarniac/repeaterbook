@@ -30,8 +30,12 @@ def csv_row_to_model(c: RepeaterCSV, /) -> Repeater:
     d = Decimal
 
     def parse_tone(t: str) -> str | None:
-        """Parse tone, return None if empty."""
-        return None if t == "CSQ" else t
+        """Parse tone, return None if empty.
+
+        The CSV spells "no tone" as "CSQ"; a blank cell is folded to None as
+        well so the field is spelled the same way as on the JSON path.
+        """
+        return None if t in {"", "CSQ"} else t
 
     return Repeater.model_validate(
         Repeater(
@@ -61,7 +65,7 @@ def csv_row_to_model(c: RepeaterCSV, /) -> Repeater:
             # default covers that, so both exports land on False.
             analog_capable=parse_flag(c["FM (analog)"]),
             dmr_capable=parse_flag(c["DMR"]),
-            dmr_color_code=c["DMR Color Code"],
+            dmr_color_code=c["DMR Color Code"] or None,
             d_star_capable=parse_flag(c["D-STAR Node"]),
             nxdn_capable=parse_flag(c["NXDN"]),
             apco_p_25_capable=parse_flag(c["P25"]),
