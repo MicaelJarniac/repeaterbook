@@ -12,8 +12,6 @@ import csv
 import io
 from typing import cast
 
-import pytest
-
 from repeaterbook.csv_export import csv_row_to_model, csv_to_models
 from repeaterbook.models import Emergency, RepeaterCSV
 from repeaterbook.services import json_to_model
@@ -185,20 +183,15 @@ def test_csv_row_to_model_is_reachable_directly() -> None:
     assert row.repeater_id == 0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "csv_row_to_model stores a blank DMR Color Code as '' where json_to_model "
-        "and every sibling field in the CSV path store None. "
-        "https://github.com/MicaelJarniac/repeaterbook/issues/71"
-    ),
-)
 def test_csv_blank_dmr_color_code_matches_json_path() -> None:
     """A blank colour code is spelled the same way whichever export it came from.
 
     `""` and `None` are both falsy in Python but only one of them is NULL in
     SQL, so a caller filtering on `Repeater.dmr_color_code.is_(None)` would get
     different rows depending on which export populated the database.
+
+    Regression test for
+    https://github.com/MicaelJarniac/repeaterbook/issues/71.
     """
     (from_csv,) = csv_to_models(_csv(_BLANK_COLOR_CODE_ROW))
     from_json = json_to_model(
@@ -219,3 +212,41 @@ def test_csv_blank_dmr_color_code_matches_json_path() -> None:
 
     assert from_json.dmr_color_code is None
     assert from_csv.dmr_color_code == from_json.dmr_color_code
+
+
+# The same repeater with both tone cells blank rather than "CSQ".
+_BLANK_TONE_ROW = (
+    "PY4PWR,29.680000,29.580000,-0.1,,"
+    "Poços de Caldas,,BR,BR,,-21.78840065,-46.56280136,"
+    ",,,,"
+    ",,,,,Yes,,,,,,,,,,,,,,,"
+)
+
+
+def test_csv_blank_tones_match_json_path() -> None:
+    """A blank tone cell is None, like "CSQ" and like a blank tone on JSON.
+
+    Same shape of bug as the colour code above (#71): the CSV path folded the
+    "CSQ" spelling of "no tone" to None but let a blank cell through as `""`.
+    """
+    (from_csv,) = csv_to_models(_csv(_BLANK_TONE_ROW))
+    from_json = json_to_model(
+        {
+            "State ID": "BR",
+            "Rptr ID": 1,
+            "Frequency": "29.680000",
+            "Input Freq": "29.580000",
+            "Nearest City": "Poços de Caldas",
+            "Lat": "-21.78840065",
+            "Long": "-46.56280136",
+            "PL": "",
+            "TSQ": "",
+            "FM Analog": "Yes",
+            "Last Update": "2026-01-01",
+        }
+    )
+
+    assert from_json.pl_ctcss_uplink is None
+    assert from_json.pl_ctcss_tsq_downlink is None
+    assert from_csv.pl_ctcss_uplink == from_json.pl_ctcss_uplink
+    assert from_csv.pl_ctcss_tsq_downlink == from_json.pl_ctcss_tsq_downlink
