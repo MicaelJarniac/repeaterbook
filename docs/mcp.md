@@ -141,6 +141,7 @@ where it landed) if the client can't find it.
 - `sync_repeaters(country?, state?, region?, modes?) -> SyncResult` — download a region into the local store.
 - `search_repeaters(lat, lon, radius_km, country?, state?, region?, bands?, modes?, status?, use?, refresh?) -> [RepeaterSpec]` — nearby repeaters, distance-sorted.
 - `get_repeater(source_id) -> [RepeaterSpec]` — one repeater by `"state_id:repeater_id"`.
+- `clear_local_data() -> ClearResult` — wipe the local store **and** the API response cache. See [Clearing local data](#clearing-local-data).
 
 Every filter is an enum, so its allowed values ride in the tool schema and a
 client sees them without consulting these docs:
@@ -153,9 +154,10 @@ client sees them without consulting these docs:
 | `use` | `OPEN` `PRIVATE` `CLOSED` |
 | `state` | RepeaterBook's own NA identifiers — see below |
 
-`modes` is one vocabulary across both tools. For `sync_repeaters`, DSTAR/FUSION/M17
-don't narrow the server-side download (the RepeaterBook API has no filter for
-them) and are instead filtered locally during `search_repeaters`.
+`modes` is one vocabulary across `sync_repeaters` and `search_repeaters`. For
+`sync_repeaters`, DSTAR/FUSION/M17 don't narrow the server-side download (the
+RepeaterBook API has no filter for them) and are instead filtered locally
+during `search_repeaters`.
 
 ### Scoping a query
 
@@ -210,6 +212,40 @@ and the store is empty, it downloads that scope first; otherwise it searches
 what's already there. Pass `refresh=True` to force a re-download — syncing
 re-parses the whole regional payload and re-merges thousands of rows, so it is
 not something to do on every search.
+
+### Clearing local data
+
+`clear_local_data` deletes everything the server keeps under
+`REPEATERBOOK_WORKING_DIR`: every row in the repeater store, and every cached
+API response. It takes no arguments and returns a `ClearResult` with
+`repeaters` and `cached_responses` — how many of each were removed — so an
+agent can report what happened. Calling it on an empty working directory is a
+no-op that reports zeros.
+
+There are two stores, and the tool clears both on purpose. The SQLite database
+holds the repeaters; the `.repeaterbook_cache/` directory beside it holds raw
+API responses for up to an hour, and a sync whose response is still cached
+re-reads that file instead of asking RepeaterBook. So emptying only the
+database would not get you fresh data: the next sync would refill it from the
+cached copy, and the "refresh" would be indistinguishable from the state you
+just cleared. After `clear_local_data`, the next sync of any scope is a
+genuine download.
+
+Nothing removed is irreplaceable — both stores hold only data that can be
+downloaded again — but the tool does discard every region the user has synced,
+so it is published with the MCP `destructiveHint` annotation, and clients that
+confirm destructive tools with the user before running them will do so here.
+It is also marked idempotent: a second call finds nothing to remove.
+
+Once cleared, `search_repeaters` behaves as on a first run: it needs a
+country/state/region to know what to download, or an explicit `sync_repeaters`
+first, and an unscoped search reports that there is no local data.
+
+Note that `refresh=True` on `search_repeaters` does **not** do this. It re-runs
+the sync, which merges the response into the store on top of what is there,
+and is still served from the response cache if the response is fresh. Use
+`clear_local_data` when you want to start from nothing or be certain the data
+came from the network.
 
 ## The repeater-spec contract
 

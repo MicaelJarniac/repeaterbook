@@ -176,6 +176,14 @@ orphaned `.tmp` behind. `aiohttp.ClientOSError` is explicitly *not* wrapped —
 it subclasses `OSError`, but a connection dropped mid-stream is a transport
 failure that happens to occur while the cache file is open.
 
+`RepeaterBookAPI.clear_cache()` is the inverse of `fetch_json()`'s write: it
+removes every `api_cache_*` entry (and any `.tmp` a hard crash left behind) and
+returns how many responses went. It deletes only what `fetch_json()` writes.
+The directory, its `.gitignore`, and anything a user put beside them are left
+alone, so it is not `rm -rf` on the cache directory. A directory that does not
+exist yet is not created just to be emptied. Failures surface as
+`RepeaterBookCacheError`, like every other cache failure.
+
 #### Row-level resilience
 
 A row that cannot be modelled — a zero input frequency, an out-of-range
@@ -246,6 +254,16 @@ The trade is that the digest is over-sensitive — an index-only change also
 triggers a wipe, costing a re-download nothing strictly required. That is the
 right direction to err. A file with no marker at all (written before this
 mechanism), or one that will not open, is treated the same way.
+
+Wiping on demand is a different operation. `truncate()` deletes every row and
+returns how many went, but leaves the file and its fingerprint marker in place,
+so the next open sees a current, empty database rather than one to discard.
+It is also safe as the very first call on a fresh working directory, because
+building the engine always leaves a usable database behind. What it does *not*
+touch is the response cache next door: a `populate()` shortly after a
+`truncate()` may be served from a cached response younger than `max_cache_age`
+rather than from the network. The MCP server's `clear_local_data` tool clears
+both for exactly that reason.
 
 !!! warning "One handle per database file"
     SQLite locking makes concurrent `RepeaterBook` instances against the same
@@ -355,8 +373,9 @@ your `except` clauses most-specific first.
 
 ## MCP server
 
-The optional `mcp` subpackage exposes three tools — `sync_repeaters`,
-`search_repeaters`, `get_repeater` — over the Model Context Protocol.
+The optional `mcp` subpackage exposes four tools — `sync_repeaters`,
+`search_repeaters`, `get_repeater`, `clear_local_data` — over the Model Context
+Protocol.
 
 It is split in two: `server.py` handles protocol concerns, configuration, and
 tool declarations, while `service.py` orchestrates the library. The split keeps
@@ -372,6 +391,16 @@ an MCP caller, so `SyncResult` carries a `truncated` flag and advice on
 narrowing scope. And blocking work (SQLite reads plus the haversine pass) is
 dispatched to a worker thread so concurrent tool calls aren't serialized behind
 it.
+
+`clear_local_data` composes two library primitives — `RepeaterBookAPI.clear_cache()`
+and `RepeaterBook.truncate()` — rather than offering them separately. The two
+stores are independent on disk, and clearing only the database is a trap: a
+cached response younger than `max_cache_age` refills it with the same data on
+the next sync. The cache goes first, so a failure there leaves the rows intact
+instead of producing exactly that half-cleared state. The tool is published
+with the MCP `destructiveHint` and `idempotentHint` annotations: everything it
+removes is re-downloadable, but it does discard every synced region, and a
+client that confirms destructive tools with the user should know to.
 
 The server is the one place a `RepeaterBook` lives for the whole process. Its
 shared context is built once, on demand, by an `lru_cache`d factory; a FastMCP

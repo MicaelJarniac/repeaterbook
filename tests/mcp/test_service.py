@@ -12,7 +12,8 @@ from pycountry import countries
 from yarl import URL
 
 from repeaterbook.database import RepeaterBook
-from repeaterbook.mcp.service import get_by_id, search, sync
+from repeaterbook.exceptions import RepeaterBookCacheError
+from repeaterbook.mcp.service import clear, get_by_id, search, sync
 from repeaterbook.models import ExportQuery, Status, Use
 from repeaterbook.queries import BandName
 from repeaterbook.services import RepeaterBookAPI
@@ -338,3 +339,100 @@ async def test_sync_counts_skipped_rows_towards_truncation(
     assert result.count == 2
     assert result.skipped == 1
     assert result.truncated is True
+
+
+async def test_clear_makes_the_next_sync_a_real_download(
+    local_server: Any,  # noqa: ANN401
+    tmp_path: Path,
+    db: RepeaterBook,
+) -> None:
+    """After a clear, a re-sync must reach the network, not the response cache.
+
+    This is the whole reason the tool clears both stores. Emptying only the
+    database would leave a response younger than `max_cache_age` in place,
+    and the next sync would quietly refill the store from it.
+    """
+    calls = 0
+
+    async def _handler(_: web.Request) -> web.Response:
+        nonlocal calls
+        calls += 1
+        return web.json_response({"count": 1, "results": [_ROW_RESULT]})
+
+    async with local_server(_handler, path="/api/exportROW.php") as url:
+        base = URL.build(scheme=url.scheme, host=url.host, port=url.port)
+        api = RepeaterBookAPI(base_url=base, working_dir=AsyncPath(tmp_path))
+        query = ExportQuery(countries=frozenset({countries.get(name="Australia")}))
+        await sync(api, db, query)
+        assert calls == 1
+
+        result = await clear(api, db)
+        assert db.query() == []
+
+        await sync(api, db, query)
+
+    assert result.repeaters == 1
+    assert result.cached_responses == 1
+    assert calls == 2
+    assert len(db.query()) == 1
+
+
+async def test_clear_on_a_fresh_working_dir_reports_zeros(
+    tmp_path: Path,
+    db: RepeaterBook,
+) -> None:
+    """Nothing to clear is a successful no-op, not an error.
+
+    A first-run agent may well reach for "start clean" before it has synced
+    anything; the working directory then has neither cache dir nor rows.
+    """
+    api = RepeaterBookAPI(working_dir=AsyncPath(tmp_path))
+
+    result = await clear(api, db)
+
+    assert result.repeaters == 0
+    assert result.cached_responses == 0
+    assert not (tmp_path / ".repeaterbook_cache").exists()
+
+
+async def test_clear_is_idempotent(
+    tmp_path: Path,
+    populated_db: PopulatedDbFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """A second clear finds nothing and says so."""
+    api = RepeaterBookAPI(working_dir=AsyncPath(tmp_path))
+    db = populated_db(sample_repeater(repeater_id=1), sample_repeater(repeater_id=2))
+
+    first = await clear(api, db)
+    second = await clear(api, db)
+
+    assert first.repeaters == 2
+    assert (second.repeaters, second.cached_responses) == (0, 0)
+
+
+async def test_clear_keeps_the_store_when_the_cache_cannot_be_cleared(
+    tmp_path: Path,
+    populated_db: PopulatedDbFactory,
+    sample_repeater: SampleRepeaterFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A cache failure aborts before the store is touched.
+
+    Half a clear is the worst outcome: an empty store next to a live cache
+    is exactly the silent-refill state the tool exists to prevent, so the
+    cache goes first and a failure there leaves the rows where they were.
+    """
+    api = RepeaterBookAPI(working_dir=AsyncPath(tmp_path))
+    db = populated_db(sample_repeater(repeater_id=1))
+
+    async def _boom(*_: object, **__: object) -> int:
+        msg = "Failed to remove cache file"
+        raise RepeaterBookCacheError(msg)
+
+    monkeypatch.setattr(RepeaterBookAPI, "clear_cache", _boom)
+
+    with pytest.raises(RepeaterBookCacheError):
+        await clear(api, db)
+
+    assert len(db.query()) == 1

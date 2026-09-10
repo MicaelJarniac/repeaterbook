@@ -159,7 +159,16 @@ repeaters2 = await api.download(query=ExportQuery(countries={brazil}))
 
 # Different query downloads from API
 repeaters3 = await api.download(query=ExportQuery(countries={argentina}))
+
+# Drop every cached response; the next download of any query hits the API.
+# Returns how many entries were removed (0 if nothing was cached yet).
+removed = await api.clear_cache()
 ```
+
+`clear_cache()` removes only the entries the client wrote and leaves the
+directory in place. It does not touch the database, so a `populate()` after a
+`truncate()` is only a real re-download if you clear the cache as well — see
+[How do I start over with fresh data?](faq.md#how-do-i-start-over-with-fresh-data).
 
 #### Progress Bars
 
@@ -283,6 +292,27 @@ The `populate()` method intelligently merges data:
 - Detects duplicates by the composite primary key, `state_id` + `repeater_id`
 - Updates existing records if they've changed
 - Adds new records
+
+### Emptying the Database
+
+`truncate()` deletes every repeater and returns how many it removed:
+
+```python
+removed = rb.truncate()
+print(f"Removed {removed} repeaters")  # 0 on an already-empty database
+```
+
+The file and its schema marker stay in place, so the next open sees a current,
+empty database rather than one to discard. It is safe as the first call on a
+fresh working directory, and safe to repeat.
+
+Because `populate()` merges rather than replaces, a re-download on its own
+never removes a repeater that RepeaterBook has since deleted; truncating first
+is how you get an exact copy of the current export. Bear in mind that the
+API client's response cache is a separate store: a `download()` right after a
+`truncate()` may be served from a response cached within the last hour. Call
+`api.clear_cache()` too if the point is to reach the network — see
+[How do I start over with fresh data?](faq.md#how-do-i-start-over-with-fresh-data).
 
 ### Querying Repeaters
 

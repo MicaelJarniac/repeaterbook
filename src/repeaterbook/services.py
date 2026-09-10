@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 __all__: tuple[str, ...] = (
+    "CACHE_ENTRY_PREFIX",
     "ROW_ERRORS",
     "STATUS_MAP",
     "USE_MAP",
@@ -219,6 +220,12 @@ async def _download_to_cache(
         await temp_file.rename(cache_file)
 
 
+# Cache entries are `api_cache_<sha256 of the URL>.json`, written via a sibling
+# `.tmp`. One prefix shared by the writer and by `RepeaterBookAPI.clear_cache`,
+# so what one creates the other is guaranteed to recognise.
+CACHE_ENTRY_PREFIX: Final[str] = "api_cache_"
+
+
 async def fetch_json(
     url: URL,
     *,
@@ -246,8 +253,8 @@ async def fetch_json(
     if cache_dir is None:
         cache_dir = Path()
     hashed_url = hashlib.sha256(str(url).encode("utf-8")).hexdigest()
-    cache_file = cache_dir / f"api_cache_{hashed_url}.json"
-    temp_file = cache_dir / f"api_cache_{hashed_url}.tmp"
+    cache_file = cache_dir / f"{CACHE_ENTRY_PREFIX}{hashed_url}.json"
+    temp_file = cache_dir / f"{CACHE_ENTRY_PREFIX}{hashed_url}.tmp"
 
     # Check if fresh cached data exists using a single stat call.
     with suppress(FileNotFoundError, json.JSONDecodeError):
@@ -548,6 +555,11 @@ class RepeaterBookAPI:
     max_cache_age: timedelta = timedelta(hours=1)
     max_count: int = 3500
 
+    @property
+    def _cache_path(self) -> Path:
+        """Where the response cache lives, whether or not it exists yet."""
+        return self.working_dir / ".repeaterbook_cache"
+
     async def cache_dir(self) -> Path:
         """Cache directory for API responses.
 
@@ -558,7 +570,7 @@ class RepeaterBookAPI:
             RepeaterBookCacheError: If the directory cannot be created, e.g. a
                 read-only working directory.
         """
-        cache = self.working_dir / ".repeaterbook_cache"
+        cache = self._cache_path
         if not await cache.exists():
             logger.info("Creating cache directory.")
             with _cache_errors("create", cache):
@@ -571,6 +583,39 @@ class RepeaterBookAPI:
                 with suppress(OSError):
                     await gitignore.write_text("*\n", encoding="utf-8")
         return cache
+
+    async def clear_cache(self) -> int:
+        """Delete every cached API response, forcing the next export to hit the network.
+
+        Only the entries `fetch_json` writes are removed. The directory itself,
+        its `.gitignore`, and anything else a caller may have put there are
+        left alone. A cache directory that does not exist yet is not created.
+
+        This is independent of the local database: `RepeaterBook.truncate` empties
+        the store, and this empties the cache that would otherwise refill it
+        with the same data. Clear both to guarantee a genuine re-download.
+
+        Returns:
+            The number of cached responses removed.
+
+        Raises:
+            RepeaterBookCacheError: If an entry cannot be removed, e.g. a
+                read-only cache directory.
+        """
+        # Not `cache_dir()`: that creates the directory, and clearing a cache
+        # that was never written should not leave one behind.
+        removed = 0
+        # Sweep stray `.tmp` files along with the committed `.json` entries. A
+        # `.tmp` is only left behind by a hard crash mid-download and is never
+        # read, but nothing else reclaims it. Only committed entries count as
+        # responses, so a leftover temp does not inflate the number reported.
+        async for entry in self._cache_path.glob(f"{CACHE_ENTRY_PREFIX}*"):
+            with _cache_errors("remove", entry):
+                await entry.unlink()
+            if entry.suffix == ".json":
+                removed += 1
+        logger.info(f"Cleared {removed} cached API responses.")
+        return removed
 
     @property
     def headers(self) -> IdentityHeaders:
