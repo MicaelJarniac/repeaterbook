@@ -1,6 +1,6 @@
 [project]
 name = "repeaterbook"
-version = "0.12.1"
+version = "0.13.0"
 description = "Unofficial third-party Python client and MCP server for the RepeaterBook.com API."
 authors = [
   {name = "Micael Jarniac", email = "micael@jarniac.dev"},

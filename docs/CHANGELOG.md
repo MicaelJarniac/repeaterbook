@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.13.0 (2026-09-10)
+
+### Features
+
+- **mcp**: Add clear_local_data to wipe the local store and response cache
+  ([`f174e89`](https://github.com/MicaelJarniac/repeaterbook/commit/f174e897d272f8fd311808e0e0f3e13ab32eb4d6))
+
+
 ## v0.12.1 (2026-09-10)
 
 ### Bug Fixes
