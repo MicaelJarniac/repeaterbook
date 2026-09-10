@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.12.1 (2026-09-10)
+
+### Bug Fixes
+
+- **csv_export**: Store blank DMR Color Code and tone cells as None
+  ([`374f10d`](https://github.com/MicaelJarniac/repeaterbook/commit/374f10dfe2c8e40fcd46ac78b2ecfda458a17c75))
+
+
 ## v0.12.0 (2026-09-09)
 
 ### Refactoring
