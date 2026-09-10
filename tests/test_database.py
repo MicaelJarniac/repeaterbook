@@ -261,6 +261,41 @@ class TestRepeaterBookDatabase:
         results = rb.query()
         assert len(results) == 0
 
+    def test_truncate_reports_how_many_rows_it_removed(
+        self, rb: RepeaterBook, sample_repeater: Repeater
+    ) -> None:
+        """The count lets a caller tell "cleared 6000 rows" from "nothing to clear"."""
+        # Not `model_copy`: on a table model that also copies SQLAlchemy's
+        # instance state, and the two would merge as one row.
+        second = Repeater(**{**sample_repeater.model_dump(), "repeater_id": 124})
+        rb.populate([sample_repeater, second])
+
+        assert rb.truncate() == 2
+        assert rb.query() == []
+
+    def test_truncate_on_an_empty_database_is_a_zero_no_op(
+        self, rb: RepeaterBook
+    ) -> None:
+        """Truncating twice, or a never-populated file, removes nothing and says so."""
+        rb.init_db()
+
+        assert rb.truncate() == 0
+        assert rb.truncate() == 0
+
+    def test_truncate_on_a_never_opened_database_builds_it_first(
+        self, rb: RepeaterBook, tmp_path: StdPath
+    ) -> None:
+        """Truncate is safe as the very first call: it creates the file, then empties.
+
+        `engine` always leaves a current-schema database behind, so there is
+        no "no such table" failure to trip over even when nothing was ever
+        populated or initialized.
+        """
+        assert not (tmp_path / "repeaterbook.db").exists()
+
+        assert rb.truncate() == 0
+        assert (tmp_path / "repeaterbook.db").exists()
+
     def test_emergency_fields_round_trip(
         self, rb: RepeaterBook, sample_repeater: Repeater
     ) -> None:

@@ -248,10 +248,21 @@ class RepeaterBook:
 
         return repeaters
 
-    def truncate(self) -> None:
-        """Truncate the database."""
+    def truncate(self) -> int:
+        """Delete every repeater, leaving the file and its schema marker in place.
+
+        This empties the data without making the file look stale: the next open
+        finds a current, empty database rather than one to discard. It does
+        not touch the API response cache, which `RepeaterBookAPI` owns; a
+        `populate` shortly after a truncate may therefore be served from that
+        cache rather than the network.
+
+        Returns:
+            The number of repeaters removed.
+        """
         with Session(self.engine) as session:
-            session.exec(delete(Repeater))
+            removed = session.exec(delete(Repeater)).rowcount
             session.commit()
 
-        logger.info("Truncated repeaters.")
+        logger.info(f"Truncated {removed} repeaters.")
+        return removed

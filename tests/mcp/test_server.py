@@ -24,13 +24,14 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.anyio
 
 
-async def test_three_tools_registered() -> None:
-    """Test the FastMCP instance registers exactly the three expected tools."""
+async def test_four_tools_registered() -> None:
+    """Test the FastMCP instance registers exactly the four expected tools."""
     tools = await server.mcp.list_tools()
     assert {t.name for t in tools} == {
         "sync_repeaters",
         "search_repeaters",
         "get_repeater",
+        "clear_local_data",
     }
 
 
@@ -383,6 +384,70 @@ async def test_get_repeater_reads_the_store(
     specs = await server.get_repeater("QLD:42")
 
     assert [s.source_id for s in specs] == ["QLD:42"]
+
+
+async def test_clear_local_data_empties_both_stores(
+    mcp_env: McpEnvFactory,
+    tmp_path: Path,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """The tool clears the repeater store and the response cache in one call.
+
+    Both live under the server's working directory, so this pins that the
+    tool reaches the *configured* directory for each, not the process cwd.
+    """
+    mcp_env()
+    ctx = server._get_context()  # noqa: SLF001
+    ctx.db.populate([sample_repeater()])
+    cache = tmp_path / ".repeaterbook_cache"
+    cache.mkdir()
+    (cache / f"api_cache_{0:064x}.json").write_text("{}", encoding="utf-8")
+
+    result = await server.clear_local_data()
+
+    assert result.repeaters == 1
+    assert result.cached_responses == 1
+    assert await server.get_repeater("QLD:42") == []
+    assert list(cache.glob("api_cache_*")) == []
+
+
+async def test_clear_local_data_then_unscoped_search_asks_for_a_scope(
+    mcp_env: McpEnvFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """After a clear, the server is back to its first-run behaviour.
+
+    The tool's description promises this, and an agent will rely on it: an
+    unscoped search must fail with the "no local data" hint rather than
+    quietly returning nothing.
+    """
+    mcp_env()
+    server._get_context().db.populate([sample_repeater()])  # noqa: SLF001
+
+    await server.clear_local_data()
+
+    with pytest.raises(ValueError, match="no local data"):
+        await server.search_repeaters(lat=-27.47, lon=153.02, radius_km=40.0)
+
+
+async def test_clear_local_data_is_flagged_destructive() -> None:
+    """The tool must carry the hints a client uses to decide whether to confirm.
+
+    Nothing here is unrecoverable, but it does throw away every row the user
+    has synced; a client that gates destructive tools behind a prompt should
+    be told to gate this one. Idempotent and closed-world are true as well
+    and let a client skip the prompt on a repeat call.
+    """
+    tools = await server.mcp.list_tools()
+    tool = next(t for t in tools if t.name == "clear_local_data")
+
+    assert tool.annotations is not None
+    assert tool.annotations.destructiveHint is True
+    assert tool.annotations.idempotentHint is True
+    assert tool.annotations.openWorldHint is False
+    # The other tools carry no annotations at all, so this is not a default
+    # bleeding through from somewhere else.
+    assert all(t.annotations is None for t in tools if t.name != "clear_local_data")
 
 
 def test_build_query_uses_the_states_own_identifier() -> None:

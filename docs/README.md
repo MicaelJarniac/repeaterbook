@@ -85,7 +85,7 @@ Welcome to the **RepeaterBook Python Client** documentation!
 ## Features
 
 - **Easy API Access**: Download repeater data from RepeaterBook.com with a simple async interface
-- **Unofficial MCP Server**: Ship repeater sync, geographic search, and lookup to any MCP client as three typed tools — see the [MCP Server guide](mcp.md)
+- **Unofficial MCP Server**: Ship repeater sync, geographic search, lookup, and a local-data wipe to any MCP client as four typed tools — see the [MCP Server guide](mcp.md)
 - **Local Database**: Store repeater information in a local SQLite database for fast queries
 - **Geographic Queries**: Find repeaters near a location using distance-based filtering
 - **Band Filtering**: Query repeaters by frequency band (2m, 70cm, etc.)
@@ -164,8 +164,9 @@ client at `uvx` and nothing needs installing up front:
 `REPEATERBOOK_APP_TOKEN` is the same **App #114** token described above; the
 server won't start without it.
 
-That exposes three tools — `sync_repeaters`, `search_repeaters`, and
-`get_repeater` — returning a stable, source-agnostic repeater spec. See the
+That exposes four tools — `sync_repeaters`, `search_repeaters`, and
+`get_repeater`, which return a stable, source-agnostic repeater spec, plus
+`clear_local_data` to wipe the local store and response cache. See the
 **[MCP Server guide](mcp.md)** for the full tool reference, filter vocabulary,
 and configuration options.
 

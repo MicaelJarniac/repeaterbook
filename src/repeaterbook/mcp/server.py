@@ -4,6 +4,7 @@ from __future__ import annotations
 
 __all__: tuple[str, ...] = (
     "RepeaterBookSettings",
+    "clear_local_data",
     "get_repeater",
     "main",
     "mcp",
@@ -20,6 +21,7 @@ from anyio import Path, to_thread
 from fastmcp import FastMCP
 from fastmcp.server.lifespan import lifespan
 from loguru import logger
+from mcp.types import ToolAnnotations
 from pycountry import countries
 from pycountry.db import Country  # noqa: TC002
 from pydantic import EmailStr, Field, SecretStr, field_validator
@@ -385,6 +387,31 @@ async def get_repeater(source_id: str) -> list[RepeaterSpec]:
     """Return repeater-specs for a single repeater by its source id."""
     ctx = _get_context()
     return await to_thread.run_sync(service.get_by_id, ctx.db, source_id)
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        # Not read-only, and there is no undo: tell a client that asks before
+        # running destructive tools to ask here. Idempotent, because a second
+        # call finds nothing to remove; closed-world, because it touches only
+        # files this server wrote.
+        destructiveHint=True,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
+async def clear_local_data() -> service.ClearResult:
+    """Delete everything stored locally: the repeater store and the API response cache.
+
+    Use this to start clean or to force the next sync to download fresh data
+    from RepeaterBook. Both stores are cleared together on purpose: emptying
+    only the repeater store would let the next sync refill it from a cached
+    response, so the "fresh" data would be the same data. Nothing is lost that
+    cannot be downloaded again. Afterwards, `search_repeaters` needs a scope
+    (or a prior `sync_repeaters`) before it can return anything.
+    """
+    ctx = _get_context()
+    return await service.clear(ctx.api, ctx.db)
 
 
 def main() -> None:  # pragma: no cover - process entry point

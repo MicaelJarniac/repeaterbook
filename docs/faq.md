@@ -241,11 +241,24 @@ async def inspect_cache():
 asyncio.run(inspect_cache())
 ```
 
-To clear the cache:
+To clear the cache, from code:
+
+```python
+removed = await api.clear_cache()
+print(f"Removed {removed} cached responses")
+```
+
+This deletes only the entries the library wrote, leaves the directory and its
+`.gitignore` in place, and is a no-op that returns `0` if nothing was ever
+cached. Or, from a shell:
 
 ```bash
 rm -rf .repeaterbook_cache/
 ```
+
+Either way, the next request for any URL goes to the network. Note that this is
+separate from the SQLite database — see
+[How do I start over with fresh data?](#how-do-i-start-over-with-fresh-data).
 
 ### Distance calculations seem wrong
 
@@ -343,11 +356,48 @@ conn.execute('VACUUM')
 conn.close()
 ```
 
-Or start fresh:
+Or start fresh — see the next question.
 
-```bash
-rm repeaterbook.db
+### How do I start over with fresh data?
+
+There are two things on disk, and "fresh" usually means clearing both:
+
+1. **The database** (`repeaterbook.db`) holds the repeaters.
+2. **The response cache** (`.repeaterbook_cache/`) holds raw API responses for
+   up to `max_cache_age` (an hour by default). A `download()` whose response is
+   still cached is served from that file, not from RepeaterBook.
+
+Emptying only the database therefore does not get you new data: the next
+`populate()` refills it from the cached response, with the same rows you just
+removed. Clear both:
+
+```python
+import asyncio
+import os
+
+from repeaterbook import RepeaterBook
+from repeaterbook.services import RepeaterBookAPI
+
+async def start_over():
+    api = RepeaterBookAPI(app_token=os.environ["REPEATERBOOK"])
+    with RepeaterBook() as rb:
+        # Cache first: if this fails, the rows are still there, rather than
+        # an empty store sitting next to a cache that would silently refill it.
+        responses = await api.clear_cache()
+        repeaters = rb.truncate()
+    print(f"Removed {repeaters} repeaters and {responses} cached responses")
+
+asyncio.run(start_over())
 ```
+
+`truncate()` empties the table but keeps the file and its schema marker, so the
+next open sees a current, empty database rather than one to discard. Both calls
+are safe to repeat and safe on a working directory nothing was ever written to;
+they simply report `0`.
+
+The equivalent from a shell is `rm repeaterbook.db .repeaterbook_cache/api_cache_*`.
+The MCP server exposes the same operation as its
+[`clear_local_data` tool](mcp.md#clearing-local-data).
 
 ### My database is suddenly empty after upgrading
 

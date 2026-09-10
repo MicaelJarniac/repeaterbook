@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
-__all__: tuple[str, ...] = ("SyncResult", "get_by_id", "search", "sync")
+__all__: tuple[str, ...] = (
+    "ClearResult",
+    "SyncResult",
+    "clear",
+    "get_by_id",
+    "search",
+    "sync",
+)
 
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from anyio import to_thread
 from haversine import Unit, haversine  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
@@ -76,6 +84,41 @@ async def sync(
             else None
         ),
     )
+
+
+class ClearResult(BaseModel):
+    """Outcome of clearing the local data: what was removed from where."""
+
+    repeaters: int = Field(
+        description="Repeaters deleted from the local store. It is now empty."
+    )
+    cached_responses: int = Field(
+        description=(
+            "Cached API responses deleted. The next sync of any scope will "
+            "download from RepeaterBook rather than re-read a cached copy."
+        )
+    )
+
+
+async def clear(api: RepeaterBookAPI, db: RepeaterBook) -> ClearResult:
+    """Empty the local store and the API response cache together.
+
+    The two are separate on disk and clearing only the store is a trap: a
+    response younger than `max_cache_age` (an hour by default) would be served
+    again on the next sync, refilling the store with exactly the data the
+    caller just asked to be rid of. Clearing both is the only way to make the
+    next sync a genuine download.
+
+    Idempotent and safe on a never-populated working directory: nothing to
+    clear reports as zeros rather than failing.
+    """
+    # Cache first, so that a failure there leaves the store intact: an
+    # inconsistent "cleared" state is worse than a fully reported failure.
+    cached_responses = await api.clear_cache()
+    # A blocking SQLite write; keep it off the event loop like the other
+    # database calls the tools make.
+    repeaters = await to_thread.run_sync(db.truncate)
+    return ClearResult(repeaters=repeaters, cached_responses=cached_responses)
 
 
 def search(  # noqa: PLR0913 - keyword-only filters mirror the MCP tool's params

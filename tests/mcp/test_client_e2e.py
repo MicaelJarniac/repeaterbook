@@ -13,19 +13,20 @@ from repeaterbook.queries import BandName
 from repeaterbook.spec import RepeaterMode, RepeaterStatus, RepeaterUse
 
 if TYPE_CHECKING:
-    from tests._types import McpEnvFactory
+    from tests._types import McpEnvFactory, SampleRepeaterFactory
 
 pytestmark = pytest.mark.anyio
 
 
-async def test_client_lists_three_tools() -> None:
-    """The MCP protocol lists exactly the three repeater tools."""
+async def test_client_lists_four_tools() -> None:
+    """The MCP protocol lists exactly the four repeater tools."""
     async with Client(server.mcp) as client:
         tools = await client.list_tools()
     assert {t.name for t in tools} == {
         "sync_repeaters",
         "search_repeaters",
         "get_repeater",
+        "clear_local_data",
     }
 
 
@@ -39,6 +40,42 @@ async def test_client_get_repeater_empty_db_returns_empty(
         result = await client.call_tool("get_repeater", {"source_id": "CA:999999"})
 
     assert result.data == []
+
+
+async def test_client_clear_local_data_round_trips(
+    mcp_env: McpEnvFactory,
+    sample_repeater: SampleRepeaterFactory,
+) -> None:
+    """clear_local_data takes no arguments and reports both counts over the wire.
+
+    The structured result is what an agent reads back to tell the user what
+    happened, so pin the field names and not just the Python return type.
+    """
+    mcp_env()
+    server._get_context().db.populate([sample_repeater()])  # noqa: SLF001
+
+    async with Client(server.mcp) as client:
+        result = await client.call_tool("clear_local_data", {})
+        after = await client.call_tool("get_repeater", {"source_id": "QLD:42"})
+
+    assert result.structured_content == {"repeaters": 1, "cached_responses": 0}
+    assert after.data == []
+
+
+async def test_clear_local_data_advertises_its_hints_over_the_wire() -> None:
+    """The destructive/idempotent hints survive serialization to the client.
+
+    They are advisory, but a client can only honour what it receives; a hint
+    set on the server object and lost on the wire protects nobody.
+    """
+    async with Client(server.mcp) as client:
+        tools = await client.list_tools()
+    tool = next(t for t in tools if t.name == "clear_local_data")
+
+    assert tool.annotations is not None
+    assert tool.annotations.destructiveHint is True
+    assert tool.annotations.idempotentHint is True
+    assert tool.inputSchema.get("properties", {}) == {}
 
 
 def _enum_values(schema: dict[str, Any], name: str) -> set[str]:
